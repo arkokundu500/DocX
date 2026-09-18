@@ -1,0 +1,1 @@
+ALTER TABLE "visits" ADD COLUMN "bookedCount" integer DEFAULT 0 NOT NULL;

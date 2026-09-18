@@ -1,0 +1,96 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "DM Sans", sans-serif;
+  --font-display: "Fraunces", serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.8rem;
+  --background: #fbfaf6;
+  --foreground: #17342f;
+  --card: #ffffff;
+  --card-foreground: #17342f;
+  --popover: #ffffff;
+  --popover-foreground: #17342f;
+  --primary: #146b5a;
+  --primary-foreground: #ffffff;
+  --secondary: #eaf3ed;
+  --secondary-foreground: #17342f;
+  --muted: #f3f7f3;
+  --muted-foreground: #78918a;
+  --accent: #f0d7cb;
+  --accent-foreground: #71352f;
+  --destructive: #b8443e;
+  --destructive-foreground: #ffffff;
+  --border: #dfe9e4;
+  --input: #dfe9e4;
+  --ring: #4a9a7a;
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { scroll-behavior: smooth; }
+  body { @apply bg-background text-foreground antialiased; font-family: "DM Sans", sans-serif; }
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [type="button"]:not(:disabled), [type="submit"]:not(:disabled), [type="reset"]:not(:disabled), a[href], select:not(:disabled), input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled) { @apply cursor-pointer; }
+  ::selection { background: #cfe8d6; color: #17342f; }
+}
+
+@layer components {
+  .container { width: 100%; margin-inline: auto; padding-inline: 1.25rem; }
+  @media (min-width: 640px) { .container { padding-inline: 1.5rem; } }
+  @media (min-width: 1024px) { .container { max-width: 1280px; padding-inline: 2rem; } }
+  .font-display { font-family: "Fraunces", serif; }
+  .font-mono { font-family: "DM Mono", monospace; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Exclude Facebook and GitHub OAuth providers from Clerk authentication */
+.cl-socialButtonsIconButton__facebook,
+.cl-socialButtonsIconButton__github,
+.cl-socialButtonsIconButton__oauth_facebook,
+.cl-socialButtonsIconButton__oauth_github,
+.cl-socialButtonsBlockButton__facebook,
+.cl-socialButtonsBlockButton__github,
+.cl-socialButtonsBlockButton__oauth_facebook,
+.cl-socialButtonsBlockButton__oauth_github,
+button[data-provider="facebook"],
+button[data-provider="github"] {
+  display: none !important;
+}
+
+/* Prevent Clerk from prompting for phone numbers */
+.cl-formFieldRow__phoneNumber,
+.cl-phoneNumberInput {
+  display: none !important;
+}

@@ -1,0 +1,299 @@
+============================================================================
+DocX — LEARN.TXT
+Project introduction, use-cases, interview Q&A, and the main debugging
+fixes worth understanding deeply.
+============================================================================
+
+----------------------------------------------------------------------------
+1. PROJECT INTRODUCTION
+----------------------------------------------------------------------------
+
+DocX is a healthcare appointment platform ("Care, without the runaround")
+built as a single-process full-stack TypeScript app.
+
+WHAT IT DOES
+  - Patients discover verified hospitals and doctors (Bengaluru dataset),
+    compare ratings/fees/specialties, and book OPD appointments in real time.
+  - Every booking locks a slot atomically — no double booking, ever.
+  - An AI assistant (OpenRouter / DeepSeek) answers care-navigation questions.
+  - A VAPI voice agent can call patients 24h before a visit to confirm,
+    cancel, or reschedule (webhook-driven, server-side only).
+  - Four role-based workspaces: Patient, Doctor, Hospital Authority,
+    Central Admin — each with its own dashboard and access guards.
+
+THE STACK (and why each piece is there)
+  - Runtime:        Node 22, pnpm workspaces (client/ + server/ + shared/)
+  - Server:         Express + tRPC v11 — end-to-end typed API, no REST
+                    layer, types flow from server routers into client hooks
+  - Frontend:       React 19 + Vite 6 (dev middleware INSIDE the Express
+                    process — one port, one process), Wouter for routing,
+                    Tailwind v4 for styling
+  - Database:       Neon Postgres (serverless driver) + Drizzle ORM —
+                    typed schema, SQL migrations, relational queries
+  - Auth:           Clerk (sign-in UI + JWT) + a local long-lived session
+                    cookie (HS256, signed with JWT_SECRET). Clerk verifies
+                    identity; the DocX cookie is the API session.
+  - AI:             OpenRouter chat completions (server-side only, key
+                    never reaches the browser), traced in LangSmith
+  - Voice:          VAPI private key server-side; webhook endpoint
+                    POST /api/vapi/webhook acknowledges calls
+  - Email:          Resend (transactional mail, server-side only)
+  - Tests:          Vitest — unit + integration + live-credential smoke
+
+REPO LAYOUT
+  client/src/pages/        Route pages (Home, Directory, Booking, Dashboards)
+  client/src/components/   DocxShell (marketing chrome), role layouts
+  client/src/lib/          trpc client, roles map, mock/demo data
+  client/src/_core/hooks/  useAuth — Clerk + DocX session glue
+  server/_core/            Express bootstrap, tRPC context, Clerk auth
+  server/routers.ts        All tRPC procedures (auth, directory, appointments…)
+  server/integrations/     VAPI + OpenRouter integration modules
+  drizzle/schema.ts        Typed DB schema (users, hospitals, doctors,
+                           visits, appointments, feedback…)
+  drizzle/                 SQL migration folders (applied in order)
+  scripts/                 Ops scripts: migrate, seed, mint-session,
+                           seed Clerk accounts, cleanup
+  shared/const.ts          Constants shared by client+server (cookie name)
+
+THE AUTH FLOW (worth memorizing)
+  1. Browser signs in via Clerk (<SignIn> component, clerk-js).
+  2. Clerk issues a short-lived JWT (rotates ~every minute).
+  3. The client publishes that JWT to window.__docxClerkToken; the tRPC
+     httpBatchLink attaches it as Authorization: Bearer <jwt>.
+  4. The server verifies the JWT against Clerk's JWKS, upserts the user
+     into the Neon users table, and sets a long-lived HS256 session
+     cookie (httpOnly, SameSite=Lax, 1 year).
+  5. Every later request authenticates from the cookie first (fast path,
+     no Clerk round-trip); the bearer path is the bootstrap/fallback.
+  6. Sign-out clears the cookie server-side and revokes the Clerk session.
+
+----------------------------------------------------------------------------
+2. USE-CASES
+----------------------------------------------------------------------------
+
+PATIENT
+  - Browse/search 100+ hospitals and doctors with images, ratings, fees.
+  - Open a hospital/doctor detail page; see facilities and visit slots.
+  - Book a specific slot (patient + slot uniqueness enforced in Postgres).
+  - See bookings on a personalized dashboard; get a confirmation ID (DX-XXXX).
+  - Ask the AI assistant which specialty/hospital fits their problem.
+  - Receive a confirmation email (Resend) and a reminder voice call (VAPI).
+
+DOCTOR
+  - Doctor workspace shows today's appointments, next visit, slots left,
+    and an upcoming patient list across their hospital visits.
+
+HOSPITAL AUTHORITY
+  - Hospital workspace shows capacity %, appointments today, care-team
+    status for their hospital only (role-guarded).
+
+CENTRAL ADMIN
+  - Directory-wide operations overview (all hospitals/doctors/visits).
+  - /admin/users manages the demo-user roster (admin-only procedure).
+
+PLATFORM / OPS
+  - pnpm db:migrate — apply SQL migrations to Neon in order.
+  - pnpm db:seed — load 100/100/100 workbook rows + featured entities.
+  - pnpm db:seed:accounts — create the 4 role demo accounts in Clerk+Neon.
+  - pnpm test — 16 tests incl. live credential checks and a concurrency
+    test that fires 8 parallel bookings for one slot (exactly 1 wins).
+  - pnpm check / pnpm build — typecheck and production build.
+
+----------------------------------------------------------------------------
+3. INTERVIEW Q&A (CORE DEVELOPMENT)
+----------------------------------------------------------------------------
+
+Q1. Why tRPC over REST/GraphQL here?
+A:  Single TypeScript repo, single team, single process. tRPC gives
+    end-to-end types: a procedure's input/output types are inferred by the
+    client hook — renaming a field breaks the client at compile time, not
+    in production. No schema-duplication (OpenAPI) or over/under-fetch
+    machinery needed at this scale.
+
+Q2. How does authentication work without a backend session store?
+A:  Stateless stateless-JWT sessions. After Clerk sign-in the server mints
+    an HS256 JWT (jose.SignJWT) containing openId + appId and sets it as an
+    httpOnly cookie for 1 year. authenticateClerkRequest() checks the
+    cookie first, verifies it with jwtVerify, loads the user from Neon.
+    No session table, no server-side state; revocation = clear cookie
+    (acceptable for a demo; production would add a denylist or short TTL
+    + refresh).
+
+Q3. Why keep Clerk if you mint your own cookie?
+A:  Separation of concerns: Clerk owns identity (passwords, OTP, MFA,
+    device management — hard problems). The DocX cookie owns application
+    session. The server never trusts the browser's Clerk state; it
+    verifies the Clerk JWT server-side via JWKS on first exchange only,
+    then relies on its own signed cookie — cheap and safe.
+
+Q4. How do you guarantee no double booking of a slot?
+A:  Defense in depth: (1) a Postgres unique constraint on
+    (visitId, patientUserId) for appointments; (2) slot capacity checks
+    inside a SERIALIZABLE-capable transaction; (3) concurrent inserts for
+    the same slot race and exactly one commit — losers get a 409-style
+    error. Proven by a Vitest test firing 8 parallel bookings at one slot.
+
+Q5. Why is the Vite dev server inside the Express process?
+A:  One port (3000), one process: Express serves /api/* and Vite middleware
+    serves the client with HMR. No CORS, no proxy config, cookie domain is
+    trivially same-origin. In production the client is built to static
+    files and Express serves them.
+
+Q6. How is the AI assistant kept safe/cheap?
+A:  The OpenRouter key lives only in server env; the client calls the
+    assistant.ask tRPC procedure, the server calls OpenRouter with a
+    system prompt scoped to care navigation ("does not diagnose"), and
+    LangSmith traces every call for evaluation. No keys in the bundle.
+
+Q7. How does the client know which dashboard a user should see?
+A:  The users table carries a role enum (user | doctor |
+    hospital_authority | admin). auth.me returns it; client/src/lib/roles
+    maps role -> home route; <Protected roles={[...]}> guards role routes
+    AND the server re-checks role on admin procedures (defense in depth —
+    the client guard is UX, the server check is security).
+
+Q8. Why Drizzle + Neon's serverless driver?
+A:  Neon separates storage/compute; the serverless driver speaks HTTP/WebSockets
+    so no TCP connection pool is needed (works great from serverless/edge
+    and from local dev). Drizzle gives typed schema + SQL migrations
+    (drizzle/ folder applied in order) with zero runtime reflection magic.
+
+Q9. What happens on the client between Clerk sign-in and first API call?
+A:  There is an ordering constraint: the Clerk token must be published
+    before auth.me runs, otherwise the server sees an anonymous request.
+    The tRPC link reads window.__docxClerkToken per request; useAuth only
+    enables the auth.me query after the token is ready (or when signed
+    out). The /auth/redirect handoff page awaits the token explicitly.
+
+Q10. How would you scale this beyond one process?
+A:  The cookie is stateless so any instance can serve any request. What
+    needs work: move slot-locking to SELECT ... FOR UPDATE inside one
+    transaction (already transactional), add Redis for rate limiting and
+    assistant caching, put the webhook handler on a queue, and run
+    migrations via CI (never auto-run on boot).
+
+Q11. Why superjson as the tRPC transformer?
+A:  Dates and other non-JSON types (createdAt, lastSignedIn) travel
+    losslessly between server and client without manual serialization at
+    every boundary.
+
+Q12. How are migrations kept safe to re-run?
+A:  scripts/apply-neon-migrations.ts tracks applied files in a
+    _migrations table (name + applied_at) and skips them; migration SQL is
+    idempotent where possible (CREATE TABLE IF NOT EXISTS …). This is why
+    seeds and migrations can be re-run on a fresh clone without damage.
+
+----------------------------------------------------------------------------
+4. MAIN DEBUGGING FIXES (DEEP KNOWLEDGE)
+----------------------------------------------------------------------------
+
+FIX 1 — "Phone numbers from this country (India) are currently not
+        supported" on Clerk sign-up
+  Root cause: Clerk DEVELOPMENT instances cannot send real SMS, and the
+  instance's sign-up requirements demanded a phone number. Any real
+  (+91…) number therefore failed.
+  Fix: enabled Clerk test mode via the Backend API
+  (clerk.instance.update({ testMode: true })). In test mode, `+1555xxxxxxx`
+  numbers and `+clerk_test` emails are auto-verified without any SMS/email
+  round-trip. Lesson: dev-instance limits are instance config, not code
+  bugs — check the /v1/instance settings before fighting the UI.
+
+FIX 2 — Signed in, but bounced back to the Clerk widget (redirect loop)
+  Root cause: the /auth/redirect handoff used react-query (useQuery) for
+  auth.me. On mount it could fire BEFORE the Clerk token was published →
+  server said "unauthenticated" → page hard-reloaded itself → loop.
+  Fix: dedicated handoff page that (a) polls clerk.session.getToken() until
+  a token exists, (b) publishes it to window.__docxClerkToken, (c) fetches
+  auth.me fresh via utils.auth.me.fetch() (bypasses cache), (d) navigates
+  exactly once (useRef guard for React StrictMode double-mount). Lesson:
+  any "authenticate then redirect" page must sequence its awaits and must
+  never trust a cached auth query from the signed-out era.
+
+FIX 3 — Server started on a random port (curl 000 / connection refused)
+  Root cause: the sandbox shell exported PORT=0, and `Number(env.PORT)`
+  happily bound the listener to an OS-assigned ephemeral port.
+  Fix: sanitize — treat 0/NaN/empty as "use the preferred port". Lesson:
+  environment variables are hostile; validate and clamp anything numeric
+  that decides behavior.
+
+FIX 4 — `NODE_ENV=development tsx …` failed silently on Windows
+  Root cause: cmd.exe has no inline `VAR=value cmd` syntax (that's POSIX).
+  Fix: cross-env in the npm scripts (`cross-env NODE_ENV=development tsx
+  watch …`). Lesson: npm scripts are the portable surface; never rely on
+  shell features inside them.
+
+FIX 5 — Vitest tests couldn't reach the database / credentials
+  Root cause: the platform used to inject .env into test processes; local
+  vitest does not load .env by itself.
+  Fix: a vitest setup file that imports dotenv/config before tests run.
+  Lesson: test processes are their own runtime — give them config
+  explicitly, don't assume the shell did.
+
+FIX 6 — Clerk user creation 422 "data doesn't match user requirements"
+  Root cause: the instance requires at least one of email/phone; first
+  attempts sent neither, then only email, then a non-RFC email domain.
+  Fix: create seeded users with BOTH a +clerk_test email and a +1555 phone.
+  Lesson: read the 422 longMessage — Clerk tells you exactly which
+  attribute violated which instance requirement.
+
+FIX 7 — Double sign-out flakiness (raw fetch cleared the cookie but the UI
+        stayed "signed in")
+  Root cause: signing out of the app and signing out of Clerk are two
+  operations; a raw fetch() only did the first.
+  Fix: the logout() helper calls the server auth.logout mutation (clears
+  the cookie), invalidates the auth.me cache, then clerk.signOut() to end
+  the Clerk session; every header button routes through it. Lesson: with
+  two identity layers you have two sign-out halves — always exercise the
+  real UI path when testing auth, not raw endpoints.
+
+FIX 8 — Role clobbering on sign-in
+  Root cause: a naive upsert would rewrite users.role on every sign-in,
+  resetting seeded roles back to "user" and breaking /admin access.
+  Fix: db.upsertUser only updates the role when the caller explicitly
+  passes one; the Clerk exchange path never passes it. Lesson: upserts
+  need field-level intent — decide per-field whether sign-in may mutate it.
+
+FIX 9 — Booking "featured" mock entities failed (row not found)
+  Root cause: the landing page featured hospitals/visits that existed only
+  in client mock data, never seeded into Neon.
+  Fix: scripts/seed-featured.ts inserts the featured hospitals, doctors,
+  and 9 bookable slots for real. Lesson: any id surfaced by the UI must
+  exist server-side — mock data is for pixels, not for flows.
+
+FIX 10 — Dead "Account" control in role dashboards (no sign-out visible)
+  Root cause: the workspace header had a hardcoded "AK" avatar and a
+  button with no onClick.
+  Fix: wired the real user (initials + name from auth.me) and a Sign out
+  button through the same logout() helper. Lesson: shell components
+  deserve the same data plumbing as pages; hardcoded UI state hides bugs
+  until someone actually clicks.
+
+BONUS DEBUGGING HEURISTICS USED THROUGHOUT
+  - Reproduce via the smallest surface first (curl the tRPC endpoint with
+    a minted cookie before blaming the UI).
+  - Mint sessions with scripts/mint-session.ts to test protected
+    endpoints without the browser.
+  - When an SPA "loop" appears, check StrictMode double-mount + cached
+    queries + await ordering before touching routing.
+  - 4xx from a SaaS API? Read longMessage/code first; grep the SDK's .d.ts
+    for the operation before inventing endpoints.
+  - Windows dev: cross-env everywhere; never `del`, always `rm` via bash;
+    sanitize numeric env vars.
+
+----------------------------------------------------------------------------
+5. TEST ACCOUNTS (local dev, seeded via pnpm db:seed:accounts)
+----------------------------------------------------------------------------
+
+  ROLE                USERNAME        PASSWORD
+  Patient             docx-patient    DocxPatient#2026
+  Admin               docx-admin      DocxAdmin#2026
+  Doctor              docx-doctor     DocxDoctor#2026
+  Hospital authority  docx-hospital   DocxHospital#2026
+
+  Sign-in: username → password → (dev instance) OTP code 424242.
+  Each role lands on its own workspace:
+    /dashboard (patient) · /admin · /doctor-admin · /hospital-admin
+  Role guards: /admin and /admin/users are admin-only; a mismatched role
+  gets the "Access restricted" page with a link back to its own workspace.
+
+============================================================================
