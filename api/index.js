@@ -497,15 +497,15 @@ var init_mock_data = __esm({
     ];
     doctors = [...featuredDoctors, ...importedDoctors.map((doctor) => ({ ...doctor, hospitalIds: [...doctor.hospitalIds] }))];
     featuredVisits = [
-      { id: "v1", doctorId: "ananya-rao", hospitalId: "apollo-green", date: "18 Sep", day: "Thu", time: "4:30 PM", capacity: 20, booked: 12, status: "Approved" },
-      { id: "v2", doctorId: "ananya-rao", hospitalId: "st-marthas", date: "19 Sep", day: "Fri", time: "10:00 AM", capacity: 18, booked: 9, status: "Approved" },
-      { id: "v3", doctorId: "ananya-rao", hospitalId: "apollo-green", date: "22 Sep", day: "Mon", time: "4:30 PM", capacity: 20, booked: 4, status: "Approved" },
-      { id: "v4", doctorId: "vivek-menon", hospitalId: "manipal-heritage", date: "19 Sep", day: "Fri", time: "10:00 AM", capacity: 16, booked: 8, status: "Approved" },
-      { id: "v5", doctorId: "vivek-menon", hospitalId: "apollo-green", date: "20 Sep", day: "Sat", time: "2:00 PM", capacity: 20, booked: 15, status: "Approved" },
-      { id: "v6", doctorId: "meera-iyer", hospitalId: "apollo-green", date: "24 Sep", day: "Wed", time: "11:30 AM", capacity: 14, booked: 5, status: "Approved" },
-      { id: "v7", doctorId: "rohan-shah", hospitalId: "manipal-heritage", date: "26 Sep", day: "Fri", time: "2:00 PM", capacity: 18, booked: 5, status: "Approved" },
-      { id: "v8", doctorId: "sana-khan", hospitalId: "st-marthas", date: "18 Sep", day: "Thu", time: "6:00 PM", capacity: 20, booked: 11, status: "Approved" },
-      { id: "v9", doctorId: "arjun-bhat", hospitalId: "st-marthas", date: "18 Sep", day: "Thu", time: "3:00 PM", capacity: 24, booked: 15, status: "Approved" }
+      { id: "v1", doctorId: "ananya-rao", hospitalId: "apollo-green", date: "20 Sep", day: "Sun", time: "11:00 AM", capacity: 20, booked: 12, status: "Approved" },
+      { id: "v2", doctorId: "ananya-rao", hospitalId: "st-marthas", date: "21 Sep", day: "Mon", time: "10:00 AM", capacity: 18, booked: 9, status: "Approved" },
+      { id: "v3", doctorId: "ananya-rao", hospitalId: "apollo-green", date: "22 Sep", day: "Tue", time: "4:30 PM", capacity: 20, booked: 4, status: "Approved" },
+      { id: "v4", doctorId: "vivek-menon", hospitalId: "manipal-heritage", date: "23 Sep", day: "Wed", time: "10:00 AM", capacity: 16, booked: 8, status: "Approved" },
+      { id: "v5", doctorId: "vivek-menon", hospitalId: "apollo-green", date: "24 Sep", day: "Thu", time: "2:00 PM", capacity: 20, booked: 15, status: "Approved" },
+      { id: "v6", doctorId: "meera-iyer", hospitalId: "apollo-green", date: "25 Sep", day: "Fri", time: "11:30 AM", capacity: 14, booked: 5, status: "Approved" },
+      { id: "v7", doctorId: "rohan-shah", hospitalId: "manipal-heritage", date: "26 Sep", day: "Sat", time: "2:00 PM", capacity: 18, booked: 5, status: "Approved" },
+      { id: "v8", doctorId: "sana-khan", hospitalId: "st-marthas", date: "27 Sep", day: "Sun", time: "6:00 PM", capacity: 20, booked: 11, status: "Approved" },
+      { id: "v9", doctorId: "arjun-bhat", hospitalId: "st-marthas", date: "28 Sep", day: "Mon", time: "3:00 PM", capacity: 24, booked: 15, status: "Approved" }
     ];
     visits = [...featuredVisits, ...importedVisits];
     testimonials = [
@@ -517,7 +517,7 @@ var init_mock_data = __esm({
       id: "DX-28419",
       doctorId: "ananya-rao",
       hospitalId: "apollo-green",
-      date: "18 September 2026",
+      date: "22 September 2026",
       time: "4:30 PM",
       reason: "Lower back pain for the last two weeks",
       status: "Confirmed"
@@ -558,6 +558,7 @@ var init_mock_data = __esm({
 // server/api.ts
 import "dotenv/config";
 import express from "express";
+import cookieParser from "cookie-parser";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
 // server/routers.ts
@@ -763,8 +764,9 @@ async function listAppointmentsForUser(userId, userEmail) {
         LEFT JOIN visits v ON v.id = a."visitId"
         LEFT JOIN doctors d ON d.id = a."doctorId"
         LEFT JOIN hospitals h ON h.id = a."hospitalId"
-        WHERE a."userId" = ${userId} OR LOWER(COALESCE(a."patientEmail", '')) = ${normalizedEmail}
-        ORDER BY COALESCE(v."startsAt", a."createdAt") DESC
+        WHERE (a."userId" = ${userId} OR LOWER(COALESCE(a."patientEmail", '')) = ${normalizedEmail})
+          AND COALESCE(v."startsAt", a."createdAt") >= NOW()
+        ORDER BY COALESCE(v."startsAt", a."createdAt") ASC
       ` : await sql`
         SELECT a."bookingId", a."visitId", a."doctorId", a."hospitalId", a."patientName", a."patientPhone", a."patientEmail", a.reason, a.reminders, a.status, a."createdAt",
                COALESCE(v."startsAt", a."createdAt") as "startsAt",
@@ -775,7 +777,8 @@ async function listAppointmentsForUser(userId, userEmail) {
         LEFT JOIN doctors d ON d.id = a."doctorId"
         LEFT JOIN hospitals h ON h.id = a."hospitalId"
         WHERE a."userId" = ${userId}
-        ORDER BY COALESCE(v."startsAt", a."createdAt") DESC
+          AND COALESCE(v."startsAt", a."createdAt") >= NOW()
+        ORDER BY COALESCE(v."startsAt", a."createdAt") ASC
       `;
   const { doctors: mockDoctors, hospitals: mockHospitals } = await Promise.resolve().then(() => (init_mock_data(), mock_data_exports));
   return rows.map((row) => {
@@ -844,6 +847,9 @@ import { SignJWT, jwtVerify } from "jose";
 
 // shared/const.ts
 var COOKIE_NAME = "app_session_id";
+var CLIENT_SESSION_COOKIE = "docx_session_active";
+var ONE_HOUR_MS = 1e3 * 60 * 60;
+var ONE_HOUR_S = 60 * 60;
 var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
 var UNAUTHED_ERR_MSG = "Please login (10001)";
 var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
@@ -1103,11 +1109,10 @@ async function verifyDocxSession(token) {
   }
 }
 async function createDocxSession(openId, name) {
-  return new SignJWT({ openId, appId: "docx-local", name }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setExpirationTime(Math.floor((Date.now() + ONE_YEAR_MS) / 1e3)).sign(getSessionSecret());
+  return new SignJWT({ openId, appId: "docx-local", name }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setExpirationTime(Math.floor((Date.now() + ONE_HOUR_MS) / 1e3)).sign(getSessionSecret());
 }
 async function authenticateClerkRequest(req, res) {
-  const cookieHeader = req.headers.cookie ?? "";
-  const cookieToken = cookieHeader.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE_NAME}=`))?.slice(COOKIE_NAME.length + 1);
+  const cookieToken = req.cookies?.[COOKIE_NAME] || (req.headers.cookie ?? "").split(";").map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE_NAME}=`))?.slice(COOKIE_NAME.length + 1);
   if (cookieToken) {
     const session = await verifyDocxSession(cookieToken);
     if (session) {
@@ -1146,7 +1151,14 @@ async function authenticateClerkRequest(req, res) {
         path: "/",
         sameSite: "lax",
         secure: req.protocol === "https",
-        maxAge: ONE_YEAR_MS
+        maxAge: ONE_HOUR_MS
+      });
+      res.cookie(CLIENT_SESSION_COOKIE, "true", {
+        httpOnly: false,
+        path: "/",
+        sameSite: "lax",
+        secure: req.protocol === "https",
+        maxAge: ONE_HOUR_MS
       });
     }
     const user = await getUserByOpenId(openId);
@@ -1158,6 +1170,7 @@ async function authenticateClerkRequest(req, res) {
 }
 function clearDocxSessionCookie(res) {
   res.clearCookie(COOKIE_NAME, { httpOnly: true, path: "/", sameSite: "lax", maxAge: -1 });
+  res.clearCookie(CLIENT_SESSION_COOKIE, { httpOnly: false, path: "/", sameSite: "lax", maxAge: -1 });
 }
 
 // server/_core/trpc.ts
@@ -2311,6 +2324,7 @@ app.use((_req, res, next) => {
 });
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ limit: "2mb", extended: true }));
+app.use(cookieParser());
 registerVapiWebhook(app);
 registerTwilioWebhooks(app);
 app.get(["/api/health", "/health"], (_req, res) => {

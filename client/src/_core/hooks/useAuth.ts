@@ -1,6 +1,8 @@
 import { useAuth as useClerkAuth, useClerk, useUser } from "@clerk/react";
 import { trpc } from "@/lib/trpc";
 import { useEffect, useState } from "react";
+import { setCookie, deleteCookie, hasCookie } from "cookies-next";
+import { COOKIE_NAME, CLIENT_SESSION_COOKIE, ONE_HOUR_S } from "@shared/const";
 
 /**
  * DocX auth hook, backed by Clerk sign-in + the DocX server session.
@@ -109,6 +111,13 @@ export function useAuth() {
 
   const user: DocxUser | null = (meQuery.data as DocxUser | null) ?? null;
 
+  // Synchronize 1-hour client session cookie via cookies-next
+  useEffect(() => {
+    if (user && !hasCookie(CLIENT_SESSION_COOKIE)) {
+      setCookie(CLIENT_SESSION_COOKIE, "true", { maxAge: ONE_HOUR_S, path: "/" });
+    }
+  }, [user]);
+
   const loading = !isLoaded || !tokenReady || meQuery.isLoading;
 
   const logout = async () => {
@@ -117,6 +126,9 @@ export function useAuth() {
     } catch {
       // Cookie may already be gone; signing out of Clerk is what matters.
     }
+    // Delete session cookies
+    deleteCookie(CLIENT_SESSION_COOKIE, { path: "/" });
+    deleteCookie(COOKIE_NAME, { path: "/" });
     window.__docxClerkToken = null;
     await utils.auth.me.invalidate();
     if (isSignedIn) {

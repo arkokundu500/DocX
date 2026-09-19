@@ -3,6 +3,7 @@ import { io, Socket } from "socket.io-client";
 import { MessageSquare, Send, X, Minimize2, Maximize2, ShieldCheck, Stethoscope, User as UserIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { playNotificationChime, playSentMessageSound } from "@/contexts/ChatContext";
 
 export interface ChatTarget {
   appointmentId: string;
@@ -19,26 +20,6 @@ interface ChatModalProps {
   open: boolean;
   onClose: () => void;
   target: ChatTarget | null;
-}
-
-// Gentle synthesized notification sound using Web Audio API
-function playChime() {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.35);
-  } catch {
-    // Ignore audio context errors if blocked by browser policy
-  }
 }
 
 export default function ChatModal({ open, onClose, target }: ChatModalProps) {
@@ -107,7 +88,7 @@ export default function ChatModal({ open, onClose, target }: ChatModalProps) {
 
       // Play chime if message from other party
       if (newMsg.senderId !== user?.id) {
-        playChime();
+        playNotificationChime();
       }
     });
 
@@ -140,6 +121,8 @@ export default function ChatModal({ open, onClose, target }: ChatModalProps) {
     if (!text || !target?.appointmentId) return;
 
     setInputMessage("");
+    // Play sent message sound immediately
+    playSentMessageSound();
 
     const payload = {
       appointmentId: target.appointmentId,
@@ -211,8 +194,8 @@ export default function ChatModal({ open, onClose, target }: ChatModalProps) {
           className="flex items-center gap-2.5 text-xs font-bold"
         >
           <span className="relative flex size-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#3b9a6d] opacity-75" />
-            <span className="relative inline-flex size-3 rounded-full bg-[#3b9a6d]" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex size-3 rounded-full bg-red-500" />
           </span>
           <MessageSquare size={16} className="text-[#a9d9bd]" />
           <span>Chat with {recipientName}</span>

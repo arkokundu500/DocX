@@ -76,7 +76,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 export function PatientDashboardPage() {
   const { user } = useAuth();
-  const { openChat } = useChat();
+  const { openChat, hasUnread } = useChat();
   const utils = trpc.useUtils();
   const myAppointments = trpc.appointments.mine.useQuery(undefined, { retry: false });
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
@@ -105,26 +105,33 @@ export function PatientDashboardPage() {
     ? (user?.name ?? "there").split(" ")[1] ?? rawFirst
     : rawFirst;
 
-  const liveRows = (myAppointments.data ?? []).map((row: any) => ({
-    bookingId: row.bookingId as string,
-    doctorId: row.doctorId as string,
-    hospitalId: row.hospitalId as string,
-    doctorName: row.doctorName || getDoctor(row.doctorId)?.name || "Consultation with Specialist",
-    hospitalName: row.hospitalName || getHospitalName(row.hospitalId),
-    patientName: row.patientName as string,
-    patientPhone: row.patientPhone as string,
-    date: new Date(row.startsAt as unknown as string).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }),
-    time: new Date(row.startsAt as unknown as string).toLocaleTimeString("en-IN", {
-      hour: "numeric",
-      minute: "2-digit",
-    }),
-    reason: String(row.reason),
-    status: row.status === "cancelled" ? "Cancelled" : "Confirmed",
-  }));
+  const liveRows = (myAppointments.data ?? [])
+    .filter((row: any) => {
+      const startsAtMs = new Date(row.startsAt as unknown as string).getTime();
+      return !isNaN(startsAtMs) && startsAtMs >= Date.now();
+    })
+    .map((row: any) => ({
+      bookingId: row.bookingId as string,
+      doctorId: row.doctorId as string,
+      hospitalId: row.hospitalId as string,
+      doctorName: row.doctorName || getDoctor(row.doctorId)?.name || "Consultation with Specialist",
+      hospitalName: row.hospitalName || getHospitalName(row.hospitalId),
+      patientName: row.patientName as string,
+      patientPhone: row.patientPhone as string,
+      rawStartsAt: new Date(row.startsAt as unknown as string).getTime(),
+      date: new Date(row.startsAt as unknown as string).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      time: new Date(row.startsAt as unknown as string).toLocaleTimeString("en-IN", {
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      reason: String(row.reason),
+      status: row.status === "cancelled" ? "Cancelled" : "Confirmed",
+    }))
+    .sort((a, b) => a.rawStartsAt - b.rawStartsAt);
 
   const latestAppt = liveRows[0];
 
@@ -173,10 +180,17 @@ export function PatientDashboardPage() {
                         appointmentTime: `${latestAppt.date} · ${latestAppt.time}`,
                       })
                     }
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#cde4d9] bg-[#eaf3ed] px-2.5 py-1 text-[11px] font-bold text-[#146b5a] hover:bg-[#146b5a] hover:text-white transition cursor-pointer"
+                    className="relative inline-flex items-center gap-1.5 rounded-lg border border-[#cde4d9] bg-[#eaf3ed] px-2.5 py-1 text-[11px] font-bold text-[#146b5a] hover:bg-[#146b5a] hover:text-white transition cursor-pointer"
                     title="Open instant chat with doctor"
                   >
-                    <MessageSquare size={12} /> Chat with Doctor
+                    <MessageSquare size={12} />
+                    <span>Chat with Doctor</span>
+                    {hasUnread(latestAppt.bookingId) && (
+                      <span className="relative flex size-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex size-2 rounded-full bg-red-500" />
+                      </span>
+                    )}
                   </button>
                   <span className="font-mono text-xs font-semibold text-[#8da19a]">
                     ID: {latestAppt.bookingId}
@@ -264,6 +278,7 @@ export function PatientDashboardPage() {
                         time={row.time}
                         reason={row.reason}
                         onDelete={() => handleDeleteAppointment(row.bookingId)}
+                        hasUnread={hasUnread(row.bookingId)}
                         onChat={() =>
                           openChat({
                             appointmentId: row.bookingId,
@@ -2069,7 +2084,7 @@ export function HospitalAdminPage() {
 export function DoctorAdminPage() {
   const liveQuery = trpc.doctorAdmin.liveData.useQuery();
   const utils = trpc.useUtils();
-  const { openChat } = useChat();
+  const { openChat, hasUnread } = useChat();
   const doctor = liveQuery.data?.doctor;
   const allHospitals = liveQuery.data?.allHospitals || [];
   const visits = liveQuery.data?.visits || [];
@@ -2277,10 +2292,17 @@ export function DoctorAdminPage() {
                               }),
                             })
                           }
-                          className="inline-flex items-center gap-1 rounded-lg border border-[#cde4d9] bg-[#f2f8f5] px-2.5 py-1 text-xs font-bold text-[#146b5a] hover:bg-[#146b5a] hover:text-white transition cursor-pointer"
+                          className="relative inline-flex items-center gap-1.5 rounded-lg border border-[#cde4d9] bg-[#f2f8f5] px-2.5 py-1 text-xs font-bold text-[#146b5a] hover:bg-[#146b5a] hover:text-white transition cursor-pointer"
                           title="Chat with Patient"
                         >
-                          <MessageSquare size={13} /> Chat
+                          <MessageSquare size={13} />
+                          <span>Chat</span>
+                          {hasUnread(a.bookingId || String(a.id)) && (
+                            <span className="relative flex size-2">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                              <span className="relative inline-flex size-2 rounded-full bg-red-500" />
+                            </span>
+                          )}
                         </button>
                       </div>
                     </td>
@@ -3086,6 +3108,7 @@ function AppointmentRow({
   reason,
   onDelete,
   onChat,
+  hasUnread = false,
 }: {
   bookingId?: string;
   status: string;
@@ -3099,6 +3122,7 @@ function AppointmentRow({
   reason: string;
   onDelete?: () => void;
   onChat?: () => void;
+  hasUnread?: boolean;
 }) {
   const mockDoc = getDoctor(doctorId);
   const displayName = doctorName || mockDoc?.name || "Consultation with Specialist";
@@ -3126,10 +3150,17 @@ function AppointmentRow({
           <button
             type="button"
             onClick={onChat}
-            className="inline-flex items-center gap-1 rounded-lg border border-[#cde4d9] bg-[#f2f8f5] px-2.5 py-1 text-xs font-bold text-[#146b5a] hover:bg-[#146b5a] hover:text-white transition cursor-pointer"
+            className="relative inline-flex items-center gap-1.5 rounded-lg border border-[#cde4d9] bg-[#f2f8f5] px-2.5 py-1 text-xs font-bold text-[#146b5a] hover:bg-[#146b5a] hover:text-white transition cursor-pointer"
             title="Chat with Doctor"
           >
-            <MessageSquare size={13} /> Chat
+            <MessageSquare size={13} />
+            <span>Chat</span>
+            {hasUnread && (
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-red-500" />
+              </span>
+            )}
           </button>
         )}
         {onDelete && (

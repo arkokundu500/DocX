@@ -202,15 +202,15 @@ const featuredDoctors: Doctor[] = [
 export const doctors: Doctor[] = [...featuredDoctors, ...importedDoctors.map((doctor) => ({ ...doctor, hospitalIds: [...doctor.hospitalIds] }))];
 
 const featuredVisits: Visit[] = [
-  { id: "v1", doctorId: "ananya-rao", hospitalId: "apollo-green", date: "18 Sep", day: "Thu", time: "4:30 PM", capacity: 20, booked: 12, status: "Approved" },
-  { id: "v2", doctorId: "ananya-rao", hospitalId: "st-marthas", date: "19 Sep", day: "Fri", time: "10:00 AM", capacity: 18, booked: 9, status: "Approved" },
-  { id: "v3", doctorId: "ananya-rao", hospitalId: "apollo-green", date: "22 Sep", day: "Mon", time: "4:30 PM", capacity: 20, booked: 4, status: "Approved" },
-  { id: "v4", doctorId: "vivek-menon", hospitalId: "manipal-heritage", date: "19 Sep", day: "Fri", time: "10:00 AM", capacity: 16, booked: 8, status: "Approved" },
-  { id: "v5", doctorId: "vivek-menon", hospitalId: "apollo-green", date: "20 Sep", day: "Sat", time: "2:00 PM", capacity: 20, booked: 15, status: "Approved" },
-  { id: "v6", doctorId: "meera-iyer", hospitalId: "apollo-green", date: "24 Sep", day: "Wed", time: "11:30 AM", capacity: 14, booked: 5, status: "Approved" },
-  { id: "v7", doctorId: "rohan-shah", hospitalId: "manipal-heritage", date: "26 Sep", day: "Fri", time: "2:00 PM", capacity: 18, booked: 5, status: "Approved" },
-  { id: "v8", doctorId: "sana-khan", hospitalId: "st-marthas", date: "18 Sep", day: "Thu", time: "6:00 PM", capacity: 20, booked: 11, status: "Approved" },
-  { id: "v9", doctorId: "arjun-bhat", hospitalId: "st-marthas", date: "18 Sep", day: "Thu", time: "3:00 PM", capacity: 24, booked: 15, status: "Approved" },
+  { id: "v1", doctorId: "ananya-rao", hospitalId: "apollo-green", date: "20 Sep", day: "Sun", time: "11:00 AM", capacity: 20, booked: 12, status: "Approved" },
+  { id: "v2", doctorId: "ananya-rao", hospitalId: "st-marthas", date: "21 Sep", day: "Mon", time: "10:00 AM", capacity: 18, booked: 9, status: "Approved" },
+  { id: "v3", doctorId: "ananya-rao", hospitalId: "apollo-green", date: "22 Sep", day: "Tue", time: "4:30 PM", capacity: 20, booked: 4, status: "Approved" },
+  { id: "v4", doctorId: "vivek-menon", hospitalId: "manipal-heritage", date: "23 Sep", day: "Wed", time: "10:00 AM", capacity: 16, booked: 8, status: "Approved" },
+  { id: "v5", doctorId: "vivek-menon", hospitalId: "apollo-green", date: "24 Sep", day: "Thu", time: "2:00 PM", capacity: 20, booked: 15, status: "Approved" },
+  { id: "v6", doctorId: "meera-iyer", hospitalId: "apollo-green", date: "25 Sep", day: "Fri", time: "11:30 AM", capacity: 14, booked: 5, status: "Approved" },
+  { id: "v7", doctorId: "rohan-shah", hospitalId: "manipal-heritage", date: "26 Sep", day: "Sat", time: "2:00 PM", capacity: 18, booked: 5, status: "Approved" },
+  { id: "v8", doctorId: "sana-khan", hospitalId: "st-marthas", date: "27 Sep", day: "Sun", time: "6:00 PM", capacity: 20, booked: 11, status: "Approved" },
+  { id: "v9", doctorId: "arjun-bhat", hospitalId: "st-marthas", date: "28 Sep", day: "Mon", time: "3:00 PM", capacity: 24, booked: 15, status: "Approved" },
 ];
 
 export const visits: Visit[] = [...featuredVisits, ...importedVisits];
@@ -225,7 +225,7 @@ export const upcomingAppointment = {
   id: "DX-28419",
   doctorId: "ananya-rao",
   hospitalId: "apollo-green",
-  date: "18 September 2026",
+  date: "22 September 2026",
   time: "4:30 PM",
   reason: "Lower back pain for the last two weeks",
   status: "Confirmed",

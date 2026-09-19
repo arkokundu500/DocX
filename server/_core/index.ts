@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -50,6 +51,7 @@ async function startServer() {
   // Configure body parser with safe size limit to prevent memory exhaustion DoS
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ limit: "2mb", extended: true }));
+  app.use(cookieParser());
   registerVapiWebhook(app);
   registerTwilioWebhooks(app);
   // tRPC API

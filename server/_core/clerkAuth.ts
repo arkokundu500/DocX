@@ -1,20 +1,20 @@
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import type { Request, Response } from "express";
 import { SignJWT, jwtVerify } from "jose";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { CLIENT_SESSION_COOKIE, COOKIE_NAME, ONE_HOUR_MS } from "@shared/const";
 import * as db from "../db";
 
 /**
- * Local / self-hosted Clerk authentication.
+ * Local / self-hosted Clerk authentication with 1-hour session expiration.
  *
  * Flow:
  *  1. The browser signs in with Clerk (`<ClerkProvider>` + Clerk-js).
  *  2. The client sends each protected API call with
  *     `Authorization: Bearer <clerk session token>` (see client useAuth).
  *  3. The server verifies the Clerk JWT, upserts the user into Neon, and
- *     issues the long-lived DocX session cookie (signed with JWT_SECRET).
- *  4. Subsequent requests authenticate via the cookie first (so auth survives
- *     reloads) and fall back to the Clerk bearer token.
+ *     issues the 1-hour DocX session cookie (signed with JWT_SECRET).
+ *  4. Subsequent requests authenticate via cookie-parser (`req.cookies[COOKIE_NAME]`).
+ *  5. Once the 1-hour cookie expires, the user is signed out automatically.
  */
 
 function getClerkClient() {
@@ -51,22 +51,23 @@ async function verifyDocxSession(token: string): Promise<{ openId: string } | nu
 async function createDocxSession(openId: string, name: string): Promise<string> {
   return new SignJWT({ openId, appId: "docx-local", name })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setExpirationTime(Math.floor((Date.now() + ONE_YEAR_MS) / 1000))
+    .setExpirationTime(Math.floor((Date.now() + ONE_HOUR_MS) / 1000))
     .sign(getSessionSecret());
 }
 
 /**
  * Resolve the current DocX user from an incoming request.
- * Checks the DocX session cookie first, then a Clerk bearer token.
+ * Checks the DocX 1-hour session cookie first, then a Clerk bearer token.
  */
 export async function authenticateClerkRequest(req: Request, res?: Response) {
-  // 1. Existing DocX session cookie (fast path, no Clerk round-trip).
-  const cookieHeader = req.headers.cookie ?? "";
-  const cookieToken = cookieHeader
-    .split(";")
-    .map(part => part.trim())
-    .find(part => part.startsWith(`${COOKIE_NAME}=`))
-    ?.slice(COOKIE_NAME.length + 1);
+  // 1. Existing DocX 1-hour session cookie (fast path via cookie-parser).
+  const cookieToken =
+    req.cookies?.[COOKIE_NAME] ||
+    (req.headers.cookie ?? "")
+      .split(";")
+      .map(part => part.trim())
+      .find(part => part.startsWith(`${COOKIE_NAME}=`))
+      ?.slice(COOKIE_NAME.length + 1);
 
   if (cookieToken) {
     const session = await verifyDocxSession(cookieToken);
@@ -106,7 +107,7 @@ export async function authenticateClerkRequest(req: Request, res?: Response) {
       lastSignedIn: new Date(),
     });
 
-    // Issue the long-lived DocX session cookie so subsequent requests skip
+    // Issue the 1-hour DocX session cookie so subsequent requests skip
     // the Clerk verification round-trip.
     if (res) {
       const sessionToken = await createDocxSession(openId, name ?? "");
@@ -115,7 +116,15 @@ export async function authenticateClerkRequest(req: Request, res?: Response) {
         path: "/",
         sameSite: "lax",
         secure: req.protocol === "https",
-        maxAge: ONE_YEAR_MS,
+        maxAge: ONE_HOUR_MS,
+      });
+      // Set client-accessible session flag for cookies-next synchronization
+      res.cookie(CLIENT_SESSION_COOKIE, "true", {
+        httpOnly: false,
+        path: "/",
+        sameSite: "lax",
+        secure: req.protocol === "https",
+        maxAge: ONE_HOUR_MS,
       });
     }
 
@@ -127,7 +136,8 @@ export async function authenticateClerkRequest(req: Request, res?: Response) {
   }
 }
 
-/** Clear the DocX session cookie. */
+/** Clear the DocX session cookies. */
 export function clearDocxSessionCookie(res: Response) {
   res.clearCookie(COOKIE_NAME, { httpOnly: true, path: "/", sameSite: "lax", maxAge: -1 });
+  res.clearCookie(CLIENT_SESSION_COOKIE, { httpOnly: false, path: "/", sameSite: "lax", maxAge: -1 });
 }

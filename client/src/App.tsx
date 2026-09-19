@@ -18,8 +18,8 @@ import AdminUsersPage from "./pages/AdminUsersPage";
 import AuthRedirectPage from "./pages/AuthRedirectPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import { ChatProvider } from "./contexts/ChatContext";
-
-const ONE_HOUR_MS = 60 * 60 * 1000; // 1 hour = 3,600,000 ms
+import { hasCookie } from "cookies-next";
+import { CLIENT_SESSION_COOKIE, ONE_HOUR_MS } from "@shared/const";
 
 function InactivityWatcher() {
   const { isAuthenticated, logout } = useAuth();
@@ -30,15 +30,17 @@ function InactivityWatcher() {
 
     let timeoutId: any;
 
-    const performSignout = async () => {
-      toast.info("You have been signed out due to 1 hour of inactivity.");
+    const performSignout = async (reasonText: string, queryParam: string) => {
+      toast.info(reasonText);
       await logout();
-      navigate("/login?reason=inactivity");
+      navigate(`/login?reason=${queryParam}`);
     };
 
     const resetTimer = () => {
       if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(performSignout, ONE_HOUR_MS);
+      timeoutId = setTimeout(() => {
+        void performSignout("You have been signed out due to 1 hour of inactivity.", "inactivity");
+      }, ONE_HOUR_MS);
     };
 
     let lastActivityTime = Date.now();
@@ -52,6 +54,14 @@ function InactivityWatcher() {
 
     resetTimer();
 
+    // 1-hour cookie expiration watcher via cookies-next (checks every 5s)
+    const cookieInterval = setInterval(() => {
+      if (!hasCookie(CLIENT_SESSION_COOKIE)) {
+        clearInterval(cookieInterval);
+        void performSignout("Your 1-hour session has expired. You have been signed out automatically.", "session_expired");
+      }
+    }, 5000);
+
     const activityEvents = ["mousedown", "mousemove", "keydown", "scroll", "touchstart", "click"];
     for (const eventName of activityEvents) {
       window.addEventListener(eventName, onUserActivity, { passive: true });
@@ -59,6 +69,7 @@ function InactivityWatcher() {
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
+      clearInterval(cookieInterval);
       for (const eventName of activityEvents) {
         window.removeEventListener(eventName, onUserActivity);
       }

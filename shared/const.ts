@@ -1,4 +1,7 @@
 export const COOKIE_NAME = "app_session_id";
+export const CLIENT_SESSION_COOKIE = "docx_session_active";
+export const ONE_HOUR_MS = 1000 * 60 * 60; // 1 hour = 3,600,000 ms
+export const ONE_HOUR_S = 60 * 60; // 3,600 seconds
 export const ONE_YEAR_MS = 1000 * 60 * 60 * 24 * 365;
 export const AXIOS_TIMEOUT_MS = 30_000;
 export const UNAUTHED_ERR_MSG = 'Please login (10001)';

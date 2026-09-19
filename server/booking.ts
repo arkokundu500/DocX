@@ -111,8 +111,9 @@ export async function listAppointmentsForUser(userId: number, userEmail?: string
         LEFT JOIN visits v ON v.id = a."visitId"
         LEFT JOIN doctors d ON d.id = a."doctorId"
         LEFT JOIN hospitals h ON h.id = a."hospitalId"
-        WHERE a."userId" = ${userId} OR LOWER(COALESCE(a."patientEmail", '')) = ${normalizedEmail}
-        ORDER BY COALESCE(v."startsAt", a."createdAt") DESC
+        WHERE (a."userId" = ${userId} OR LOWER(COALESCE(a."patientEmail", '')) = ${normalizedEmail})
+          AND COALESCE(v."startsAt", a."createdAt") >= NOW()
+        ORDER BY COALESCE(v."startsAt", a."createdAt") ASC
       `
     : await sql`
         SELECT a."bookingId", a."visitId", a."doctorId", a."hospitalId", a."patientName", a."patientPhone", a."patientEmail", a.reason, a.reminders, a.status, a."createdAt",
@@ -124,7 +125,8 @@ export async function listAppointmentsForUser(userId: number, userEmail?: string
         LEFT JOIN doctors d ON d.id = a."doctorId"
         LEFT JOIN hospitals h ON h.id = a."hospitalId"
         WHERE a."userId" = ${userId}
-        ORDER BY COALESCE(v."startsAt", a."createdAt") DESC
+          AND COALESCE(v."startsAt", a."createdAt") >= NOW()
+        ORDER BY COALESCE(v."startsAt", a."createdAt") ASC
       `;
 
   const { doctors: mockDoctors, hospitals: mockHospitals } = await import("../client/src/lib/mock-data");
