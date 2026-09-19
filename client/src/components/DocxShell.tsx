@@ -220,7 +220,7 @@ export function Footer() {
 
           <div className="mt-14 flex flex-col gap-3 border-t border-white/10 pt-5 text-xs text-white/45 sm:flex-row sm:items-center sm:justify-between">
             <span>© 2026 DocX Technologies. Built for better visits.</span>
-            <span>DocX is a booking and care-navigation platform, not a medical provider.</span>
+            <span>Built with care by Arko Kundu</span>
           </div>
         </div>
       </footer>
@@ -486,19 +486,19 @@ export function VoiceReminderCard({
     activeAppt?.date ||
     (activeAppt?.startsAt
       ? new Date(activeAppt.startsAt).toLocaleDateString("en-IN", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
       : "Tomorrow");
 
   const rawTime =
     activeAppt?.time ||
     (activeAppt?.startsAt
       ? new Date(activeAppt.startsAt).toLocaleTimeString("en-IN", {
-          hour: "numeric",
-          minute: "2-digit",
-        })
+        hour: "numeric",
+        minute: "2-digit",
+      })
       : "10:30 AM");
 
   const bookingId = activeAppt?.bookingId;
@@ -657,11 +657,10 @@ export function VoiceReminderCard({
             <button
               onClick={handleConfirm}
               disabled={isConfirmed || confirmMutation.isPending}
-              className={`rounded-xl py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                isConfirmed
+              className={`rounded-xl py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${isConfirmed
                   ? "bg-[#277352] text-white"
                   : "bg-[#e1f3e7] text-[#277352] hover:bg-[#d2edd9]"
-              }`}
+                }`}
             >
               {isConfirmed ? (
                 <>
@@ -706,10 +705,10 @@ export function MobileBottomNav() {
     user?.role === "doctor"
       ? "Doctor"
       : user?.role === "hospital_authority"
-      ? "Hospital"
-      : user?.role === "admin"
-      ? "Admin"
-      : "Dashboard";
+        ? "Hospital"
+        : user?.role === "admin"
+          ? "Admin"
+          : "Dashboard";
 
   return (
     <div className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-30 grid grid-cols-5 rounded-2xl border border-[#dfe9e4] bg-[#fbfaf6]/95 p-1 shadow-[0_12px_40px_rgba(26,61,52,0.14)] backdrop-blur-xl sm:hidden">
