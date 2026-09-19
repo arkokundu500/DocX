@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { normalizeVapiEvent } from "./vapi";
 
 export function registerVapiWebhook(app: Express) {
-  app.post("/api/vapi/webhook", (req: Request, res: Response) => {
+  app.post(["/api/vapi/webhook", "/vapi/webhook"], (req: Request, res: Response) => {
     const expectedSecret = process.env.VAPI_SERVER_SECRET;
     const providedSecret = req.header("x-vapi-secret") || req.header("x-vapi-webhook-secret");
     if (expectedSecret && providedSecret !== expectedSecret) {

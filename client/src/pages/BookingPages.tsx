@@ -52,7 +52,7 @@ export function BookingPage() {
         department: doctorDetailQuery.data.department,
         fee: Number(doctorDetailQuery.data.fee) || 1200,
         image: getDoctor(doctorDetailQuery.data.id)?.image || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=480&q=85",
-        bio: `Specialist at ${effectiveHospitalId ? getHospital(effectiveHospitalId).name : "DocX partner hospital"}.`,
+        bio: `Specialist at ${effectiveHospitalId ? getHospital(effectiveHospitalId)?.name || "DocX partner hospital" : "DocX partner hospital"}.`,
         rating: Number(doctorDetailQuery.data.rating) || 4.8,
         reviewCount: doctorDetailQuery.data.reviewCount || 100,
         experienceYears: doctorDetailQuery.data.experienceYears || 10,
@@ -325,7 +325,7 @@ export function BookingPage() {
                                 {visit.day}, {visit.date} · {visit.time}
                               </div>
                               <div className="mt-1 text-xs text-[#78918a]">
-                                {visitHospital.name} · {open} slots shown available
+                                {visitHospital?.name || "Partner Clinic"} · {open} slots shown available
                               </div>
                             </div>
                           </div>
@@ -402,7 +402,7 @@ export function BookingPage() {
                 <SummaryLine
                   icon={<MapPin size={14} />}
                   label="Location"
-                  value={getHospital(selectedVisit?.hospitalId || hospital.id).name}
+                  value={getHospital(selectedVisit?.hospitalId || hospital.id)?.name || hospital.name}
                 />
                 <SummaryLine
                   icon={<Phone size={14} />}

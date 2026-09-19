@@ -1,10 +1,10 @@
 import "dotenv/config";
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../server/routers";
-import { createContext } from "../server/_core/context";
-import { registerVapiWebhook } from "../server/integrations/vapi-webhook";
-import { registerTwilioWebhooks } from "../server/integrations/twilio-webhook";
+import { appRouter } from "./routers";
+import { createContext } from "./_core/context";
+import { registerVapiWebhook } from "./integrations/vapi-webhook";
+import { registerTwilioWebhooks } from "./integrations/twilio-webhook";
 
 const app = express();
 
@@ -24,18 +24,22 @@ app.use(express.urlencoded({ limit: "2mb", extended: true }));
 registerVapiWebhook(app);
 registerTwilioWebhooks(app);
 
+// Root / Health check endpoints
+app.get(["/api/health", "/health"], (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+app.get(["/api", "/"], (_req, res) => {
+  res.json({ name: "DocX API", status: "ok", timestamp: new Date().toISOString() });
+});
+
 // tRPC entrypoint
 app.use(
-  "/api/trpc",
+  ["/api/trpc", "/trpc"],
   createExpressMiddleware({
     router: appRouter,
     createContext,
   })
 );
-
-// Health check endpoint
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
 
 export default app;

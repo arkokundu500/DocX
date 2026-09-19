@@ -63,8 +63,13 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+const clerkPubKey =
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
+  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  "";
+
 createRoot(document.getElementById("root")!).render(
-  <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}>
+  <ClerkProvider publishableKey={clerkPubKey}>
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
         <App />

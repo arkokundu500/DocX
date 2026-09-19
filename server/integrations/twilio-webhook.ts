@@ -8,7 +8,7 @@ export function registerTwilioWebhooks(app: Express) {
   /**
    * Generates dynamic TwiML for outbound reminder calls.
    */
-  app.all("/api/twilio/voice/reminder-twiml", (req: Request, res: Response) => {
+  app.all(["/api/twilio/voice/reminder-twiml", "/twilio/voice/reminder-twiml"], (req: Request, res: Response) => {
     const patientName = String(req.query.patientName || req.body.patientName || "Patient");
     const doctorName = String(req.query.doctorName || req.body.doctorName || "your specialist");
     const hospitalName = String(req.query.hospitalName || req.body.hospitalName || "DocX Partner Hospital");
@@ -37,7 +37,7 @@ export function registerTwilioWebhooks(app: Express) {
   /**
    * Handles user speech or DTMF responses from <Gather>.
    */
-  app.post("/api/twilio/voice/gather-response", async (req: Request, res: Response) => {
+  app.post(["/api/twilio/voice/gather-response", "/twilio/voice/gather-response"], async (req: Request, res: Response) => {
     const digits = typeof req.body.Digits === "string" ? req.body.Digits : undefined;
     const speechResult = typeof req.body.SpeechResult === "string" ? req.body.SpeechResult : undefined;
     const bookingId = String(req.query.bookingId || req.body.bookingId || "");
@@ -73,7 +73,7 @@ export function registerTwilioWebhooks(app: Express) {
   /**
    * Tracks call lifecycle events (initiated, ringing, answered, completed).
    */
-  app.post("/api/twilio/voice/status", (req: Request, res: Response) => {
+  app.post(["/api/twilio/voice/status", "/twilio/voice/status"], (req: Request, res: Response) => {
     const callSid = req.body.CallSid;
     const callStatus = req.body.CallStatus;
     const duration = req.body.CallDuration;

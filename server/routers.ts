@@ -268,9 +268,11 @@ export const appRouter = router({
 
         const isOwner =
           appt.userId === ctx.user.id ||
-          (Boolean(appt.patientEmail) &&
-            Boolean(ctx.user.email) &&
-            appt.patientEmail.trim().toLowerCase() === ctx.user.email.trim().toLowerCase());
+          Boolean(
+            appt.patientEmail &&
+              ctx.user.email &&
+              appt.patientEmail.trim().toLowerCase() === ctx.user.email.trim().toLowerCase()
+          );
         const isAdmin = ctx.user.role === "admin";
 
         if (!isOwner && !isAdmin) {
