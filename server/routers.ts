@@ -19,6 +19,7 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { doctors as doctorsTable, hospitals as hospitalsTable } from "../drizzle/schema";
 import { getDb, updateUserProfile, getUserByEmailOrPhone } from "./db";
+import { getIO } from "./_core/socket";
 
 export const appRouter = router({
   auth: router({
@@ -501,7 +502,7 @@ export const appRouter = router({
       }),
   }),
   twilio: router({
-    createVoiceReminder: protectedProcedure
+    createVoiceReminder: publicProcedure
       .input(
         z.object({
           to: z.string().trim().min(7).max(30),
@@ -624,6 +625,102 @@ export const appRouter = router({
       .input(z.object({ to: z.string().min(7), message: z.string().min(1) }))
       .mutation(async ({ input }) => {
         return sendSmsNotification(input.to, input.message);
+      }),
+  }),
+  chat: router({
+    getHistory: publicProcedure
+      .input(z.object({ appointmentId: z.string().min(1) }))
+      .query(async ({ input }) => {
+        const dbUrl = process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL;
+        if (!dbUrl) return [];
+        const sql = neon(dbUrl);
+        try {
+          const rows = await sql`
+            SELECT id, "appointmentId", "bookingId", "senderId", "senderName", "senderRole", message, "createdAt"
+            FROM chat_messages
+            WHERE "appointmentId" = ${input.appointmentId}
+            ORDER BY "createdAt" ASC
+            LIMIT 100;
+          `;
+          return rows.map((r: any) => ({
+            id: Number(r.id),
+            appointmentId: String(r.appointmentId),
+            bookingId: r.bookingId ? String(r.bookingId) : undefined,
+            senderId: Number(r.senderId),
+            senderName: String(r.senderName),
+            senderRole: String(r.senderRole),
+            message: String(r.message),
+            createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+          }));
+        } catch (e) {
+          console.warn("[Chat Router] Failed to load messages:", e);
+          return [];
+        }
+      }),
+    sendMessage: publicProcedure
+      .input(
+        z.object({
+          appointmentId: z.string().min(1),
+          bookingId: z.string().optional(),
+          senderId: z.number().optional(),
+          senderName: z.string().min(1),
+          senderRole: z.enum(["user", "doctor", "admin"]).default("user"),
+          message: z.string().trim().min(1).max(2000),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const dbUrl = process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL;
+        const senderId = ctx.user?.id || input.senderId || 1;
+        const senderName = ctx.user?.name || input.senderName;
+        const senderRole = ctx.user?.role === "doctor" ? "doctor" : input.senderRole;
+        const createdAt = new Date().toISOString();
+
+        let insertedId = Date.now();
+        if (dbUrl) {
+          try {
+            const sql = neon(dbUrl);
+            const [inserted] = await sql`
+              INSERT INTO chat_messages ("appointmentId", "bookingId", "senderId", "senderName", "senderRole", message, "createdAt")
+              VALUES (${input.appointmentId}, ${input.bookingId || null}, ${senderId}, ${senderName}, ${senderRole}, ${input.message}, ${createdAt})
+              RETURNING id;
+            `;
+            if (inserted) insertedId = Number(inserted.id);
+          } catch (e) {
+            console.warn("[Chat Router] DB save error:", e);
+          }
+        }
+
+        const payload = {
+          id: insertedId,
+          appointmentId: input.appointmentId,
+          bookingId: input.bookingId,
+          senderId,
+          senderName,
+          senderRole,
+          message: input.message,
+          createdAt,
+        };
+
+        // Broadcast live via Socket.io
+        try {
+          const io = getIO();
+          if (io) {
+            io.to(`appointment_${input.appointmentId}`).emit("receive_message", payload);
+            io.emit("chat_notification", {
+              appointmentId: input.appointmentId,
+              bookingId: input.bookingId,
+              senderId,
+              senderName,
+              senderRole,
+              preview: input.message.slice(0, 80),
+              createdAt,
+            });
+          }
+        } catch (err) {
+          console.warn("[Chat Router] Socket emit warning:", err);
+        }
+
+        return payload;
       }),
   }),
   vapi: router({

@@ -25,7 +25,8 @@ describe("Twilio Voice & Formatting Service", () => {
 
     expect(twiml).toContain("<Response>");
     expect(twiml).toContain('voice="Polly.Aditi"');
-    expect(twiml).toContain("Namaste Arko Kundu");
+    expect(twiml).toContain("Hello from DocX ....");
+    expect(twiml).toContain("Thank you for using DocX.");
     expect(twiml).toContain("Dr. Ramesh Gupta");
     expect(twiml).toContain("Apollo Multispecialty Hospital");
     expect(twiml).toContain("<Gather");
@@ -48,7 +49,8 @@ describe("Twilio Voice & Formatting Service", () => {
     const rescheduleDigit = generateGatherResponseTwiML({ digits: "2" });
     expect(rescheduleDigit.confirmed).toBe(false);
     expect(rescheduleDigit.action).toBe("reschedule");
-    expect(rescheduleDigit.twiml).toContain("rescheduling");
+    expect(rescheduleDigit.twiml).toContain("reschedule");
+    expect(rescheduleDigit.twiml).toContain("Thank you for using DocX.");
 
     const rescheduleSpeech = generateGatherResponseTwiML({ speechResult: "Please reschedule my visit" });
     expect(rescheduleSpeech.confirmed).toBe(false);

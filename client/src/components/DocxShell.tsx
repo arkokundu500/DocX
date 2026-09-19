@@ -13,6 +13,7 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Stethoscope,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -50,6 +51,7 @@ export function TopNav() {
   const { user, isAuthenticated, logout, loading } = useAuth();
   const navItems = [
     { label: "Find care", href: "/hospitals" },
+    { label: "Find Doc", href: "/doctors" },
     { label: "How it works", href: "/#how-it-works" },
     ...(isAuthenticated && user?.role === "hospital_authority" ? [{ label: "Hospital workspace", href: "/hospital-admin" }] : []),
     ...(isAuthenticated && user?.role === "doctor" ? [{ label: "Doctor workspace", href: "/doctor-admin" }] : []),
@@ -519,6 +521,9 @@ export function VoiceReminderCard({
     },
   });
 
+  const [customPhone, setCustomPhone] = useState(user?.phone || activeAppt?.patientPhone || "+917439817750");
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+
   const handleConfirm = () => {
     if (bookingId) {
       confirmMutation.mutate({ bookingId });
@@ -529,10 +534,10 @@ export function VoiceReminderCard({
   };
 
   const handleTestCall = async () => {
-    const targetPhone = user?.phone || activeAppt?.patientPhone || "+917439817750";
+    const targetPhone = customPhone.trim() || user?.phone || activeAppt?.patientPhone || "+917439817750";
     setIsCalling(true);
     try {
-      await createVoiceReminder.mutateAsync({
+      const res = await createVoiceReminder.mutateAsync({
         to: targetPhone,
         patientName: user?.name || activeAppt?.patientName || "Patient",
         doctorName,
@@ -541,7 +546,14 @@ export function VoiceReminderCard({
         appointmentTime: rawTime,
         bookingId: bookingId || undefined,
       });
-      toast.success(`Twilio Voice Agent is dialing ${targetPhone} now! Please answer your phone.`);
+
+      if ((res as any)?.status === "trial_skipped") {
+        toast.info(
+          `Twilio Trial Mode: Call queued for ${targetPhone}. Note: Twilio trial accounts require verifying caller IDs at twilio.com/user/account/phone-numbers/verified.`
+        );
+      } else {
+        toast.success(`Twilio Voice Agent is dialing ${targetPhone} now! Please answer your phone.`);
+      }
     } catch (err: any) {
       toast.error(err?.message || "Failed to place voice call. Check phone number.");
     } finally {
@@ -583,9 +595,35 @@ export function VoiceReminderCard({
                 </>
               )}
             </button>
-            <span className="text-[11px] font-medium text-[#906660]">
-              Target: <strong className="text-[#71352f]">{user?.phone || activeAppt?.patientPhone || "+917439817750"}</strong>
-            </span>
+
+            {isEditingPhone ? (
+              <div className="flex items-center gap-2 rounded-full border border-[#ead8d0] bg-white px-3 py-1 shadow-xs">
+                <input
+                  value={customPhone}
+                  onChange={(e) => setCustomPhone(e.target.value)}
+                  placeholder="+91..."
+                  className="w-32 bg-transparent text-xs font-bold text-[#71352f] outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPhone(false)}
+                  className="text-[10px] font-bold text-[#146b5a] hover:underline"
+                >
+                  Save
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#906660]">
+                <span>Target: <strong className="text-[#71352f]">{customPhone}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPhone(true)}
+                  className="text-[10px] font-bold text-[#b8443e] hover:underline cursor-pointer ml-1"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -674,20 +712,21 @@ export function MobileBottomNav() {
       : "Dashboard";
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-30 grid grid-cols-4 rounded-2xl border border-[#dfe9e4] bg-[#fbfaf6]/95 p-1.5 shadow-[0_12px_40px_rgba(26,61,52,0.14)] backdrop-blur-xl sm:hidden">
-      <BottomNavItem href="/" label="Home" active={location === "/"} icon={<HeartPulse size={17} />} />
-      <BottomNavItem href="/hospitals" label="Find care" active={location.startsWith("/hospitals")} icon={<Search size={17} />} />
+    <div className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-30 grid grid-cols-5 rounded-2xl border border-[#dfe9e4] bg-[#fbfaf6]/95 p-1 shadow-[0_12px_40px_rgba(26,61,52,0.14)] backdrop-blur-xl sm:hidden">
+      <BottomNavItem href="/" label="Home" active={location === "/"} icon={<HeartPulse size={16} />} />
+      <BottomNavItem href="/hospitals" label="Care" active={location.startsWith("/hospitals")} icon={<Search size={16} />} />
+      <BottomNavItem href="/doctors" label="Find Doc" active={location === "/doctors"} icon={<Stethoscope size={16} />} />
       <BottomNavItem
         href={workspaceHref}
         label={workspaceLabel}
         active={location.startsWith(workspaceHref)}
-        icon={<Clock3 size={17} />}
+        icon={<Clock3 size={16} />}
       />
       <BottomNavItem
         href={isAuthenticated ? "/account" : "/login"}
         label={isAuthenticated ? "Account" : "Sign in"}
         active={location.startsWith("/login") || location.startsWith("/account")}
-        icon={<ShieldCheck size={17} />}
+        icon={<ShieldCheck size={16} />}
       />
     </div>
   );

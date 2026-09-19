@@ -53,7 +53,10 @@ function getTwilioConfig() {
 async function triggerTwilioVoiceReminder(input) {
   const config = getTwilioConfig();
   const normalizedTo = formatE1642(input.to);
-  const baseUrl = input.appUrl || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  let baseUrl = input.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://doc-x-five.vercel.app";
+  if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
+    baseUrl = "https://doc-x-five.vercel.app";
+  }
   const queryParams = new URLSearchParams({
     patientName: input.patientName,
     doctorName: input.doctorName,
@@ -62,10 +65,7 @@ async function triggerTwilioVoiceReminder(input) {
     appointmentTime: input.appointmentTime,
     bookingId: input.bookingId || ""
   });
-  let twimlUrl = `${baseUrl}/api/twilio/voice/reminder-twiml?${queryParams.toString()}`;
-  if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
-    twimlUrl = "https://webhooks.twilio.com/v1/Voice/Template/voice_speech_recognition";
-  }
+  const twimlUrl = `${baseUrl}/api/twilio/voice/reminder-twiml?${queryParams.toString()}`;
   const params = new URLSearchParams({
     To: normalizedTo,
     From: config.fromNumber,
@@ -84,7 +84,7 @@ async function triggerTwilioVoiceReminder(input) {
     const isTrialLimitation = response.status === 403 || data.code === 21210 || data.code === 21608 || data.code === 60200 || typeof data.message === "string" && data.message.toLowerCase().includes("trial");
     if (isTrialLimitation) {
       console.warn(
-        `[Twilio Voice Trial Notice] Outbound call to ${normalizedTo} was skipped because recipient is not a verified tester in Twilio Trial Console.`
+        `[Twilio Voice Trial Notice] Outbound call to ${normalizedTo} was restricted by Twilio Trial Console. Verify caller ID or upgrade account.`
       );
       return {
         sid: `trial_voice_skip_${Date.now()}`,
@@ -106,17 +106,15 @@ async function triggerTwilioVoiceReminder(input) {
   };
 }
 function generateReminderTwiML(input) {
-  const actionUrl = input.actionUrl || "/api/twilio/voice/gather-response";
+  const actionUrl = input.actionUrl || "https://doc-x-five.vercel.app/api/twilio/voice/gather-response";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="en-IN">
-    Namaste ${escapeXml(input.patientName)}. This is an automated appointment reminder from DocX healthcare.
-    You have an upcoming consultation with ${escapeXml(input.doctorName)} at ${escapeXml(input.hospitalName)} on ${escapeXml(input.appointmentDate)} at ${escapeXml(input.appointmentTime)}.
-    To confirm your appointment, please press 1 or say confirm. To request rescheduling, please press 2 or say reschedule.
+    Hello from DocX .... This is an automated care appointment reminder for ${escapeXml(input.patientName)}. You have a scheduled consultation with ${escapeXml(input.doctorName)} at ${escapeXml(input.hospitalName)} on ${escapeXml(input.appointmentDate)} at ${escapeXml(input.appointmentTime)}. To confirm your appointment, please press 1 or say confirm. To reschedule, please press 2 or say reschedule. Thank you for using DocX.
   </Say>
   <Gather input="speech dtmf" timeout="6" numDigits="1" action="${escapeXml(actionUrl)}">
     <Say voice="Polly.Aditi" language="en-IN">
-      We did not detect a response. Your appointment remains confirmed with ${escapeXml(input.hospitalName)}. Thank you for choosing DocX. Take care and goodbye!
+      Hello from DocX .... We did not detect your response. Your appointment remains booked with ${escapeXml(input.hospitalName)}. Thank you for using DocX.
     </Say>
   </Gather>
 </Response>`;
@@ -134,7 +132,7 @@ function generateGatherResponseTwiML(input) {
       twiml: `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="en-IN">
-    Thank you! Your appointment has been successfully confirmed. A confirmation SMS has also been dispatched. We look forward to seeing you at ${escapeXml(hosp)}. Have a wonderful day!
+    Hello from DocX .... Thank you! Your appointment has been successfully confirmed. We look forward to seeing you at ${escapeXml(hosp)}. Thank you for using DocX.
   </Say>
 </Response>`
     };
@@ -146,7 +144,7 @@ function generateGatherResponseTwiML(input) {
       twiml: `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="en-IN">
-    Understood. We have flagged your appointment for rescheduling. A patient care coordinator from ${escapeXml(hosp)} will reach out to you shortly to coordinate a new time slot. Goodbye!
+    Hello from DocX .... Understood. We have recorded your request to reschedule. A care coordinator from ${escapeXml(hosp)} will call you shortly. Thank you for using DocX.
   </Say>
 </Response>`
     };
@@ -157,7 +155,7 @@ function generateGatherResponseTwiML(input) {
     twiml: `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="en-IN">
-    Thank you for your response. Your status has been noted. Please visit the DocX web dashboard at any time to manage your booking. Goodbye!
+    Hello from DocX .... Thank you for your response. You can manage your appointment anytime on the DocX website. Thank you for using DocX.
   </Say>
 </Response>`
   };
@@ -565,7 +563,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 // server/routers.ts
 init_demo_data();
 import { z } from "zod";
-import { neon as neon4 } from "@neondatabase/serverless";
+import { neon as neon5 } from "@neondatabase/serverless";
 import { createClerkClient as createClerkClient2 } from "@clerk/backend";
 
 // server/integrations/openrouter.ts
@@ -942,6 +940,16 @@ var appointments = pgTable("appointments", {
   status: appointmentStatus("status").notNull().default("confirmed"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
 }, (table) => ({ visitUserUnique: uniqueIndex("appointments_visit_user_unique").on(table.visitId, table.userId) }));
+var chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  appointmentId: varchar("appointmentId", { length: 64 }).notNull(),
+  bookingId: varchar("bookingId", { length: 32 }),
+  senderId: integer("senderId").notNull(),
+  senderName: varchar("senderName", { length: 160 }).notNull(),
+  senderRole: varchar("senderRole", { length: 32 }).notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+});
 
 // server/db.ts
 var _db = null;
@@ -1191,6 +1199,16 @@ var adminProcedure = t.procedure.use(
 // server/routers.ts
 import { TRPCError as TRPCError2 } from "@trpc/server";
 import { nanoid as nanoid2 } from "nanoid";
+
+// server/_core/socket.ts
+import { Server as SocketIOServer } from "socket.io";
+import { neon as neon4 } from "@neondatabase/serverless";
+var io = null;
+function getIO() {
+  return io;
+}
+
+// server/routers.ts
 var appRouter = router({
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
@@ -1336,17 +1354,17 @@ var appRouter = router({
       source: "DocX_Hospital_Doctor_Demo_Database.xlsx"
     })),
     doctor: publicProcedure.input(z.object({ id: z.string().min(1) })).query(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const [row] = await sql`SELECT * FROM doctors WHERE id = ${input.id} LIMIT 1`;
       return row || null;
     }),
     hospital: publicProcedure.input(z.object({ id: z.string().min(1) })).query(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const [row] = await sql`SELECT * FROM hospitals WHERE id = ${input.id} LIMIT 1`;
       return row || null;
     }),
     visit: publicProcedure.input(z.object({ id: z.string().min(1) })).query(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const [row] = await sql`
           SELECT v.*, d.name as "doctorName", d.specialty as "doctorSpecialty", d.department as "doctorDepartment", d.fee as "doctorFee",
                  h.name as "hospitalName", h.city as "hospitalCity", h.address as "hospitalAddress"
@@ -1375,7 +1393,7 @@ var appRouter = router({
       reminders: z.boolean().default(false)
     })).mutation(({ ctx, input }) => createAppointment({ ...input, userId: ctx.user.id })),
     confirm: protectedProcedure.input(z.object({ bookingId: z.string().min(1) })).mutation(async ({ ctx, input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       await sql`
           UPDATE appointments
           SET status = 'confirmed'
@@ -1384,7 +1402,7 @@ var appRouter = router({
       return { success: true };
     }),
     cancel: protectedProcedure.input(z.object({ bookingId: z.string().min(1) })).mutation(async ({ ctx, input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       await sql`
           UPDATE appointments
           SET status = 'cancelled'
@@ -1393,7 +1411,7 @@ var appRouter = router({
       return { success: true };
     }),
     delete: protectedProcedure.input(z.object({ bookingId: z.string().min(1) })).mutation(async ({ ctx, input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const bookingId = input.bookingId.trim();
       const [appt] = await sql`
           SELECT id, "bookingId", "visitId", "userId", "patientEmail", status FROM appointments
@@ -1525,7 +1543,7 @@ var appRouter = router({
         status: z.string().default("Approved")
       })
     ).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const id = `v-${nanoid2(8)}`;
       const dateObj = new Date(input.startsAt);
       await sql`
@@ -1544,7 +1562,7 @@ var appRouter = router({
         status: z.string().optional()
       })
     ).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       if (input.hospitalId) {
         await sql`UPDATE visits SET "hospitalId" = ${input.hospitalId} WHERE id = ${input.id}`;
       }
@@ -1561,7 +1579,7 @@ var appRouter = router({
       return { success: true };
     }),
     delete: protectedProcedure.input(z.object({ id: z.string().min(1) })).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       await sql`DELETE FROM appointments WHERE "visitId" = ${input.id}`;
       await sql`DELETE FROM visits WHERE id = ${input.id}`;
       return { success: true };
@@ -1572,7 +1590,7 @@ var appRouter = router({
         hospitalId: z.string().optional()
       }).optional()
     ).query(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       let rows = [];
       if (input?.doctorId && input?.hospitalId) {
         rows = await sql`
@@ -1615,7 +1633,7 @@ var appRouter = router({
     })
   }),
   twilio: router({
-    createVoiceReminder: protectedProcedure.input(
+    createVoiceReminder: publicProcedure.input(
       z.object({
         to: z.string().trim().min(7).max(30),
         patientName: z.string().trim().min(2).max(120),
@@ -1723,6 +1741,93 @@ var appRouter = router({
       return sendSmsNotification(input.to, input.message);
     })
   }),
+  chat: router({
+    getHistory: publicProcedure.input(z.object({ appointmentId: z.string().min(1) })).query(async ({ input }) => {
+      const dbUrl = process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL;
+      if (!dbUrl) return [];
+      const sql = neon5(dbUrl);
+      try {
+        const rows = await sql`
+            SELECT id, "appointmentId", "bookingId", "senderId", "senderName", "senderRole", message, "createdAt"
+            FROM chat_messages
+            WHERE "appointmentId" = ${input.appointmentId}
+            ORDER BY "createdAt" ASC
+            LIMIT 100;
+          `;
+        return rows.map((r) => ({
+          id: Number(r.id),
+          appointmentId: String(r.appointmentId),
+          bookingId: r.bookingId ? String(r.bookingId) : void 0,
+          senderId: Number(r.senderId),
+          senderName: String(r.senderName),
+          senderRole: String(r.senderRole),
+          message: String(r.message),
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt)
+        }));
+      } catch (e) {
+        console.warn("[Chat Router] Failed to load messages:", e);
+        return [];
+      }
+    }),
+    sendMessage: publicProcedure.input(
+      z.object({
+        appointmentId: z.string().min(1),
+        bookingId: z.string().optional(),
+        senderId: z.number().optional(),
+        senderName: z.string().min(1),
+        senderRole: z.enum(["user", "doctor", "admin"]).default("user"),
+        message: z.string().trim().min(1).max(2e3)
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const dbUrl = process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL;
+      const senderId = ctx.user?.id || input.senderId || 1;
+      const senderName = ctx.user?.name || input.senderName;
+      const senderRole = ctx.user?.role === "doctor" ? "doctor" : input.senderRole;
+      const createdAt = (/* @__PURE__ */ new Date()).toISOString();
+      let insertedId = Date.now();
+      if (dbUrl) {
+        try {
+          const sql = neon5(dbUrl);
+          const [inserted] = await sql`
+              INSERT INTO chat_messages ("appointmentId", "bookingId", "senderId", "senderName", "senderRole", message, "createdAt")
+              VALUES (${input.appointmentId}, ${input.bookingId || null}, ${senderId}, ${senderName}, ${senderRole}, ${input.message}, ${createdAt})
+              RETURNING id;
+            `;
+          if (inserted) insertedId = Number(inserted.id);
+        } catch (e) {
+          console.warn("[Chat Router] DB save error:", e);
+        }
+      }
+      const payload = {
+        id: insertedId,
+        appointmentId: input.appointmentId,
+        bookingId: input.bookingId,
+        senderId,
+        senderName,
+        senderRole,
+        message: input.message,
+        createdAt
+      };
+      try {
+        const io2 = getIO();
+        if (io2) {
+          io2.to(`appointment_${input.appointmentId}`).emit("receive_message", payload);
+          io2.emit("chat_notification", {
+            appointmentId: input.appointmentId,
+            bookingId: input.bookingId,
+            senderId,
+            senderName,
+            senderRole,
+            preview: input.message.slice(0, 80),
+            createdAt
+          });
+        }
+      } catch (err) {
+        console.warn("[Chat Router] Socket emit warning:", err);
+      }
+      return payload;
+    })
+  }),
   vapi: router({
     createReminder: protectedProcedure.input(z.object({
       customerNumber: z.string().trim().min(7).max(30),
@@ -1738,7 +1843,7 @@ var appRouter = router({
   }),
   hospitalAdmin: router({
     liveData: protectedProcedure.query(async ({ ctx }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const targetHospId = ctx.user.hospitalId || "apollo-green";
       const [hosp] = await sql`SELECT * FROM hospitals WHERE id = ${targetHospId} OR name = ${ctx.user.hospitalName || ""} LIMIT 1`;
       const activeHosp = hosp || (await sql`SELECT * FROM hospitals LIMIT 1`)[0];
@@ -1777,7 +1882,7 @@ var appRouter = router({
   }),
   doctorAdmin: router({
     liveData: protectedProcedure.query(async ({ ctx }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       let [doc] = await sql`SELECT * FROM doctors WHERE email = ${ctx.user.email || ""} OR phone = ${ctx.user.phone || ""} LIMIT 1`;
       if (!doc) {
         [doc] = await sql`SELECT * FROM doctors LIMIT 1`;
@@ -1811,7 +1916,7 @@ var appRouter = router({
   }),
   admin: router({
     liveStats: adminProcedure.query(async () => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const [hospCount] = await sql`SELECT count(*)::int as count FROM hospitals`;
       const [docCount] = await sql`SELECT count(*)::int as count FROM doctors`;
       const [userCount] = await sql`SELECT count(*)::int as count FROM users`;
@@ -1871,7 +1976,7 @@ var appRouter = router({
         search: z.string().optional()
       }).optional()
     ).query(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       let rows;
       if (input?.role && input.role !== "all") {
         rows = await sql`SELECT * FROM users WHERE role::text = ${input.role} ORDER BY "createdAt" DESC LIMIT 100`;
@@ -1891,7 +1996,7 @@ var appRouter = router({
         search: z.string().optional()
       }).optional()
     ).query(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const rows = await sql`
           SELECT 
             u.id,
@@ -1925,7 +2030,7 @@ var appRouter = router({
       return rows;
     }),
     patientAppointments: adminProcedure.input(z.object({ userId: z.number().int() })).query(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       return sql`
           SELECT a.*, d.name as "doctorName", d.specialty as "doctorSpecialty", h.name as "hospitalName", h.city as "hospitalCity"
           FROM appointments a
@@ -1949,7 +2054,7 @@ var appRouter = router({
         medicalNotes: z.string().optional()
       })
     ).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const openId = `user_${nanoid2(12)}`;
       const [inserted] = await sql`
           INSERT INTO users ("openId", name, email, phone, role, city, age, gender, "bloodGroup", "emergencyContact", "medicalNotes", "onboardingCompleted")
@@ -1973,7 +2078,7 @@ var appRouter = router({
         medicalNotes: z.string().optional()
       })
     ).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       if (input.name) await sql`UPDATE users SET name = ${input.name} WHERE id = ${input.id}`;
       if (input.email) await sql`UPDATE users SET email = ${input.email} WHERE id = ${input.id}`;
       if (input.phone) await sql`UPDATE users SET phone = ${input.phone} WHERE id = ${input.id}`;
@@ -1988,13 +2093,13 @@ var appRouter = router({
       return updated;
     }),
     deleteUser: adminProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       await sql`DELETE FROM appointments WHERE "userId" = ${input.id}`;
       await sql`DELETE FROM users WHERE id = ${input.id}`;
       return { success: true };
     }),
     listDoctors: adminProcedure.query(async () => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       return sql`SELECT * FROM doctors ORDER BY name ASC LIMIT 100`;
     }),
     createDoctor: adminProcedure.input(
@@ -2009,7 +2114,7 @@ var appRouter = router({
         rating: z.string().default("4.8")
       })
     ).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const id = `doc-${nanoid2(8)}`;
       const docName = input.name.startsWith("Dr.") ? input.name : `Dr. ${input.name}`;
       await sql`
@@ -2030,7 +2135,7 @@ var appRouter = router({
         email: z.string().optional()
       })
     ).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       if (input.name) await sql`UPDATE doctors SET name = ${input.name} WHERE id = ${input.id}`;
       if (input.specialty) await sql`UPDATE doctors SET specialty = ${input.specialty} WHERE id = ${input.id}`;
       if (input.department) await sql`UPDATE doctors SET department = ${input.department} WHERE id = ${input.id}`;
@@ -2041,14 +2146,14 @@ var appRouter = router({
       return { success: true };
     }),
     deleteDoctor: adminProcedure.input(z.object({ id: z.string().min(1) })).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       await sql`DELETE FROM visits WHERE "doctorId" = ${input.id}`;
       await sql`DELETE FROM appointments WHERE "doctorId" = ${input.id}`;
       await sql`DELETE FROM doctors WHERE id = ${input.id}`;
       return { success: true };
     }),
     listHospitals: adminProcedure.query(async () => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       return sql`SELECT * FROM hospitals ORDER BY name ASC LIMIT 100`;
     }),
     createHospital: adminProcedure.input(
@@ -2062,7 +2167,7 @@ var appRouter = router({
         rating: z.string().default("4.8")
       })
     ).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       const id = `hosp-${nanoid2(8)}`;
       await sql`
           INSERT INTO hospitals (id, name, type, address, city, "bedCapacity", phone, rating, "reviewCount", "ambulanceAvailable")
@@ -2081,7 +2186,7 @@ var appRouter = router({
         phone: z.string().optional()
       })
     ).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       if (input.name) await sql`UPDATE hospitals SET name = ${input.name} WHERE id = ${input.id}`;
       if (input.type) await sql`UPDATE hospitals SET type = ${input.type} WHERE id = ${input.id}`;
       if (input.address) await sql`UPDATE hospitals SET address = ${input.address} WHERE id = ${input.id}`;
@@ -2091,7 +2196,7 @@ var appRouter = router({
       return { success: true };
     }),
     deleteHospital: adminProcedure.input(z.object({ id: z.string().min(1) })).mutation(async ({ input }) => {
-      const sql = neon4(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
+      const sql = neon5(process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL || "");
       await sql`DELETE FROM visits WHERE "hospitalId" = ${input.id}`;
       await sql`DELETE FROM appointments WHERE "hospitalId" = ${input.id}`;
       await sql`DELETE FROM hospitals WHERE id = ${input.id}`;

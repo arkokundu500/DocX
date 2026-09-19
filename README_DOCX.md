@@ -2,6 +2,8 @@
 
 DocX is a mobile-first healthcare discovery and appointment-booking MVP. It includes a polished patient-facing experience, hospital and doctor discovery, appointment booking, patient dashboard, and role-aware operational previews.
 
+🌐 **Live Production Website**: [https://doc-x-five.vercel.app/](https://doc-x-five.vercel.app/)
+
 ## Run it locally (Windows/macOS/Linux)
 
 ```bash

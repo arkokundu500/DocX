@@ -62,8 +62,12 @@ export async function triggerTwilioVoiceReminder(input: TwilioVoiceReminderInput
   const config = getTwilioConfig();
   const normalizedTo = formatE164(input.to);
 
-  // Determine webhook URL for TwiML
-  const baseUrl = input.appUrl || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  // Determine public webhook URL for Twilio
+  let baseUrl = input.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://doc-x-five.vercel.app";
+  if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
+    baseUrl = "https://doc-x-five.vercel.app";
+  }
+
   const queryParams = new URLSearchParams({
     patientName: input.patientName,
     doctorName: input.doctorName,
@@ -73,14 +77,7 @@ export async function triggerTwilioVoiceReminder(input: TwilioVoiceReminderInput
     bookingId: input.bookingId || "",
   });
 
-  // Construct TwiML webhook URL
-  // If in local development, Twilio's hosted voice speech template or ngrok proxy can be used
-  let twimlUrl = `${baseUrl}/api/twilio/voice/reminder-twiml?${queryParams.toString()}`;
-  if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
-    // For local environments without a public domain, fallback to Twilio voice speech recognition template
-    // while keeping parameters in headers/query
-    twimlUrl = "https://webhooks.twilio.com/v1/Voice/Template/voice_speech_recognition";
-  }
+  const twimlUrl = `${baseUrl}/api/twilio/voice/reminder-twiml?${queryParams.toString()}`;
 
   const params = new URLSearchParams({
     To: normalizedTo,
@@ -107,7 +104,7 @@ export async function triggerTwilioVoiceReminder(input: TwilioVoiceReminderInput
       (typeof data.message === "string" && data.message.toLowerCase().includes("trial"));
     if (isTrialLimitation) {
       console.warn(
-        `[Twilio Voice Trial Notice] Outbound call to ${normalizedTo} was skipped because recipient is not a verified tester in Twilio Trial Console.`
+        `[Twilio Voice Trial Notice] Outbound call to ${normalizedTo} was restricted by Twilio Trial Console. Verify caller ID or upgrade account.`
       );
       return {
         sid: `trial_voice_skip_${Date.now()}`,
@@ -132,6 +129,7 @@ export async function triggerTwilioVoiceReminder(input: TwilioVoiceReminderInput
 
 /**
  * Generates dynamic TwiML XML for appointment reminders using <Response>, <Say>, and <Gather>.
+ * Prompt starts with "Hello from DocX ...." and ends with "Thank you for using DocX."
  */
 export function generateReminderTwiML(input: {
   patientName: string;
@@ -142,18 +140,16 @@ export function generateReminderTwiML(input: {
   bookingId?: string;
   actionUrl?: string;
 }): string {
-  const actionUrl = input.actionUrl || "/api/twilio/voice/gather-response";
+  const actionUrl = input.actionUrl || "https://doc-x-five.vercel.app/api/twilio/voice/gather-response";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="en-IN">
-    Namaste ${escapeXml(input.patientName)}. This is an automated appointment reminder from DocX healthcare.
-    You have an upcoming consultation with ${escapeXml(input.doctorName)} at ${escapeXml(input.hospitalName)} on ${escapeXml(input.appointmentDate)} at ${escapeXml(input.appointmentTime)}.
-    To confirm your appointment, please press 1 or say confirm. To request rescheduling, please press 2 or say reschedule.
+    Hello from DocX .... This is an automated care appointment reminder for ${escapeXml(input.patientName)}. You have a scheduled consultation with ${escapeXml(input.doctorName)} at ${escapeXml(input.hospitalName)} on ${escapeXml(input.appointmentDate)} at ${escapeXml(input.appointmentTime)}. To confirm your appointment, please press 1 or say confirm. To reschedule, please press 2 or say reschedule. Thank you for using DocX.
   </Say>
   <Gather input="speech dtmf" timeout="6" numDigits="1" action="${escapeXml(actionUrl)}">
     <Say voice="Polly.Aditi" language="en-IN">
-      We did not detect a response. Your appointment remains confirmed with ${escapeXml(input.hospitalName)}. Thank you for choosing DocX. Take care and goodbye!
+      Hello from DocX .... We did not detect your response. Your appointment remains booked with ${escapeXml(input.hospitalName)}. Thank you for using DocX.
     </Say>
   </Gather>
 </Response>`;
@@ -181,7 +177,7 @@ export function generateGatherResponseTwiML(input: {
       twiml: `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="en-IN">
-    Thank you! Your appointment has been successfully confirmed. A confirmation SMS has also been dispatched. We look forward to seeing you at ${escapeXml(hosp)}. Have a wonderful day!
+    Hello from DocX .... Thank you! Your appointment has been successfully confirmed. We look forward to seeing you at ${escapeXml(hosp)}. Thank you for using DocX.
   </Say>
 </Response>`,
     };
@@ -194,7 +190,7 @@ export function generateGatherResponseTwiML(input: {
       twiml: `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="en-IN">
-    Understood. We have flagged your appointment for rescheduling. A patient care coordinator from ${escapeXml(hosp)} will reach out to you shortly to coordinate a new time slot. Goodbye!
+    Hello from DocX .... Understood. We have recorded your request to reschedule. A care coordinator from ${escapeXml(hosp)} will call you shortly. Thank you for using DocX.
   </Say>
 </Response>`,
     };
@@ -206,7 +202,7 @@ export function generateGatherResponseTwiML(input: {
     twiml: `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Aditi" language="en-IN">
-    Thank you for your response. Your status has been noted. Please visit the DocX web dashboard at any time to manage your booking. Goodbye!
+    Hello from DocX .... Thank you for your response. You can manage your appointment anytime on the DocX website. Thank you for using DocX.
   </Say>
 </Response>`,
   };

@@ -10,12 +10,14 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { roleHome } from "./lib/roles";
 import Home from "./pages/Home";
 import { HospitalsPage, HospitalDetailPage, DoctorDetailPage } from "./pages/DirectoryPages";
+import DoctorsPage from "./pages/DoctorsPage";
 import { BookingPage, ConfirmationPage } from "./pages/BookingPages";
 import { AccountPage, CentralAdminPage, DoctorAdminPage, FeedbackPage, HospitalAdminPage, LoginPage, PatientDashboardPage } from "./pages/DashboardPages";
 import NotFound from "./pages/NotFound";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AuthRedirectPage from "./pages/AuthRedirectPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import { ChatProvider } from "./contexts/ChatContext";
 
 const ONE_HOUR_MS = 60 * 60 * 1000; // 1 hour = 3,600,000 ms
 
@@ -121,6 +123,7 @@ function Router() {
     <Route path="/onboarding">{() => <Protected allowUnonboarded={true}><OnboardingPage /></Protected>}</Route>
     <Route path="/hospitals">{() => guard(<HospitalsPage />)}</Route>
     <Route path="/hospitals/:id">{(params) => guard(<HospitalDetailPage id={params.id} />)}</Route>
+    <Route path="/doctors">{() => guard(<DoctorsPage />)}</Route>
     <Route path="/doctors/:id">{(params) => guard(<DoctorDetailPage id={params.id} />)}</Route>
     <Route path="/appointment/book">{() => guard(<BookingPage />)}</Route>
     <Route path="/appointment/confirmation">{() => guard(<ConfirmationPage />)}</Route>
@@ -142,9 +145,11 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <Toaster />
-          <InactivityWatcher />
-          <Router />
+          <ChatProvider>
+            <Toaster />
+            <InactivityWatcher />
+            <Router />
+          </ChatProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

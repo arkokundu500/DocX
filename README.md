@@ -9,7 +9,9 @@
 [![Neon](https://img.shields.io/badge/Postgres-Neon%20Serverless-00e699.svg)](https://neon.tech/)
 [![Clerk](https://img.shields.io/badge/Auth-Clerk-6C47FF.svg)](https://clerk.com/)
 [![Twilio](https://img.shields.io/badge/Voice-Twilio-F22F46.svg)](https://www.twilio.com/)
-[![Resend](https://img.shields.io/badge/Email-Resend-000000.svg)](https://resend.com/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-doc--x--five.vercel.app-146b5a.svg?style=for-the-badge&logo=vercel)](https://doc-x-five.vercel.app/)
+
+> 🌐 **Live Website**: [https://doc-x-five.vercel.app/](https://doc-x-five.vercel.app/)
 
 ---
 

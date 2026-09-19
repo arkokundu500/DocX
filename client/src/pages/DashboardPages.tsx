@@ -27,6 +27,7 @@ import {
   Plus,
   Search,
   Settings2,
+  MessageSquare,
   ShieldCheck,
   Sparkles,
   Stethoscope,
@@ -36,6 +37,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useChat } from "@/contexts/ChatContext";
 import {
   AppLayout,
   AppointmentMiniCard,
@@ -74,6 +76,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 export function PatientDashboardPage() {
   const { user } = useAuth();
+  const { openChat } = useChat();
   const utils = trpc.useUtils();
   const myAppointments = trpc.appointments.mine.useQuery(undefined, { retry: false });
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
@@ -158,6 +161,23 @@ export function PatientDashboardPage() {
                   Next Upcoming Visit
                 </span>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openChat({
+                        appointmentId: latestAppt.bookingId,
+                        bookingId: latestAppt.bookingId,
+                        doctorName: latestAppt.doctorName,
+                        patientName: user?.name || "Patient",
+                        hospitalName: latestAppt.hospitalName,
+                        appointmentTime: `${latestAppt.date} · ${latestAppt.time}`,
+                      })
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#cde4d9] bg-[#eaf3ed] px-2.5 py-1 text-[11px] font-bold text-[#146b5a] hover:bg-[#146b5a] hover:text-white transition cursor-pointer"
+                    title="Open instant chat with doctor"
+                  >
+                    <MessageSquare size={12} /> Chat with Doctor
+                  </button>
                   <span className="font-mono text-xs font-semibold text-[#8da19a]">
                     ID: {latestAppt.bookingId}
                   </span>
@@ -244,6 +264,16 @@ export function PatientDashboardPage() {
                         time={row.time}
                         reason={row.reason}
                         onDelete={() => handleDeleteAppointment(row.bookingId)}
+                        onChat={() =>
+                          openChat({
+                            appointmentId: row.bookingId,
+                            bookingId: row.bookingId,
+                            doctorName: row.doctorName,
+                            patientName: user?.name || "Patient",
+                            hospitalName: row.hospitalName,
+                            appointmentTime: `${row.date} · ${row.time}`,
+                          })
+                        }
                       />
                       <div className="px-4 pb-3 text-right font-mono text-[10px] font-semibold text-[#9aa9a4]">
                         Booking Ref: {row.bookingId}
@@ -2039,6 +2069,7 @@ export function HospitalAdminPage() {
 export function DoctorAdminPage() {
   const liveQuery = trpc.doctorAdmin.liveData.useQuery();
   const utils = trpc.useUtils();
+  const { openChat } = useChat();
   const doctor = liveQuery.data?.doctor;
   const allHospitals = liveQuery.data?.allHospitals || [];
   const visits = liveQuery.data?.visits || [];
@@ -2213,7 +2244,7 @@ export function DoctorAdminPage() {
                 <th className="pb-3 font-semibold">Slot Date & Time</th>
                 <th className="pb-3 font-semibold">Reason for Visit</th>
                 <th className="pb-3 font-semibold">Ref ID</th>
-                <th className="pb-3 font-semibold text-right">Status</th>
+                <th className="pb-3 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#edf2ef]">
@@ -2229,7 +2260,29 @@ export function DoctorAdminPage() {
                     <td className="py-3 text-[11px] text-[#78918a] max-w-[200px] truncate">{a.reason}</td>
                     <td className="py-3 font-mono text-[10px] text-[#9aa9a4]">{a.bookingId}</td>
                     <td className="py-3 text-right">
-                      <TrustPill tone="green">{a.status}</TrustPill>
+                      <div className="flex items-center justify-end gap-2">
+                        <TrustPill tone="green">{a.status}</TrustPill>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openChat({
+                              appointmentId: a.bookingId || String(a.id),
+                              bookingId: a.bookingId,
+                              doctorName: doctor?.name || "Doctor",
+                              patientName: a.patientName || "Patient",
+                              hospitalName: a.hospitalName,
+                              appointmentTime: new Date(a.startsAt).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                              }),
+                            })
+                          }
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#cde4d9] bg-[#f2f8f5] px-2.5 py-1 text-xs font-bold text-[#146b5a] hover:bg-[#146b5a] hover:text-white transition cursor-pointer"
+                          title="Chat with Patient"
+                        >
+                          <MessageSquare size={13} /> Chat
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -3032,6 +3085,7 @@ function AppointmentRow({
   time,
   reason,
   onDelete,
+  onChat,
 }: {
   bookingId?: string;
   status: string;
@@ -3044,6 +3098,7 @@ function AppointmentRow({
   time: string;
   reason: string;
   onDelete?: () => void;
+  onChat?: () => void;
 }) {
   const mockDoc = getDoctor(doctorId);
   const displayName = doctorName || mockDoc?.name || "Consultation with Specialist";
@@ -3067,6 +3122,16 @@ function AppointmentRow({
           <div className="mt-1 text-[11px] text-[#78918a]">{time}</div>
         </div>
         <TrustPill tone={status === "Confirmed" ? "green" : "cream"}>{status}</TrustPill>
+        {onChat && (
+          <button
+            type="button"
+            onClick={onChat}
+            className="inline-flex items-center gap-1 rounded-lg border border-[#cde4d9] bg-[#f2f8f5] px-2.5 py-1 text-xs font-bold text-[#146b5a] hover:bg-[#146b5a] hover:text-white transition cursor-pointer"
+            title="Chat with Doctor"
+          >
+            <MessageSquare size={13} /> Chat
+          </button>
+        )}
         {onDelete && (
           <button
             type="button"

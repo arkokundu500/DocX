@@ -91,9 +91,22 @@ export const appointments = pgTable("appointments", {
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({ visitUserUnique: uniqueIndex("appointments_visit_user_unique").on(table.visitId, table.userId) }));
 
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  appointmentId: varchar("appointmentId", { length: 64 }).notNull(),
+  bookingId: varchar("bookingId", { length: 32 }),
+  senderId: integer("senderId").notNull(),
+  senderName: varchar("senderName", { length: 160 }).notNull(),
+  senderRole: varchar("senderRole", { length: 32 }).notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Hospital = typeof hospitals.$inferSelect;
 export type Doctor = typeof doctors.$inferSelect;
 export type Visit = typeof visits.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;

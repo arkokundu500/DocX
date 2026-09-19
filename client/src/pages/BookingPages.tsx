@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { ArrowRight, CalendarDays, Check, Clock3, FileText, LockKeyhole, Mail, MapPin, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, Clock3, FileText, LockKeyhole, Mail, MapPin, MessageSquare, Phone, ShieldCheck, UserRound } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useChat } from "@/contexts/ChatContext";
 import { AppLayout, Breadcrumbs, Rating, TrustPill } from "@/components/DocxShell";
 import { trpc } from "@/lib/trpc";
 import { roleHome } from "@/lib/roles";
@@ -425,6 +426,7 @@ export function BookingPage() {
 export function ConfirmationPage() {
   const search = useSearch();
   const { user } = useAuth();
+  const { openChat } = useChat();
   const homeHref = roleHome(user?.role);
 
   const params = useMemo(() => {
@@ -564,6 +566,31 @@ export function ConfirmationPage() {
                 </div>
               </div>
             </div>
+
+            {/* Direct Realtime Chat with Doctor */}
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-[#cde4d9] bg-[#f2f8f5] p-4">
+              <div className="text-center sm:text-left">
+                <div className="text-xs font-bold text-[#146b5a]">Have questions before your visit?</div>
+                <div className="text-[11px] text-[#6b8179]">Direct instant chat with {doctor.name} is now open in a pop-up window.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  openChat({
+                    appointmentId: bookingId,
+                    bookingId: bookingId,
+                    doctorName: doctor.name,
+                    patientName: user?.name || "Patient",
+                    hospitalName: hospital.name,
+                    appointmentTime: `${visitTimeFormatted.date} · ${visitTimeFormatted.time}`,
+                  })
+                }
+                className="inline-flex items-center gap-2 rounded-xl bg-[#146b5a] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0e4c42] transition cursor-pointer shrink-0"
+              >
+                <MessageSquare size={14} /> Chat with Doctor
+              </button>
+            </div>
+
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <Link
                 href={homeHref}

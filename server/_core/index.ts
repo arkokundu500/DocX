@@ -8,6 +8,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerVapiWebhook } from "../integrations/vapi-webhook";
 import { registerTwilioWebhooks } from "../integrations/twilio-webhook";
+import { initSocket } from "./socket";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -35,6 +36,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  initSocket(server);
 
   // Security headers to prevent MIME-sniffing, clickjacking, and XSS leaks
   app.use((_req, res, next) => {
