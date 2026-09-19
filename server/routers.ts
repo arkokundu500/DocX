@@ -657,6 +657,46 @@ export const appRouter = router({
           return [];
         }
       }),
+    getRecentNotifications: protectedProcedure
+      .query(async ({ ctx }) => {
+        const dbUrl = process.env.DOCX_DATABASE_URL || process.env.DATABASE_URL;
+        if (!dbUrl || !ctx.user?.id) return [];
+        const sql = neon(dbUrl);
+        try {
+          const isDoc = ctx.user.role === "doctor";
+          const rows = await sql`
+            SELECT m.id, m."appointmentId", m."bookingId", m."senderId", m."senderName", m."senderRole", m.message, m."createdAt"
+            FROM chat_messages m
+            WHERE m."senderId" != ${ctx.user.id}
+              AND (
+                m."bookingId" IN (
+                  SELECT "bookingId" FROM appointments
+                  WHERE ${isDoc ? sql`"doctorId" = ${String(ctx.user.id)} OR "doctorId" = ${ctx.user.openId || ""}` : sql`"userId" = ${ctx.user.id}`}
+                )
+                OR m."appointmentId" IN (
+                  SELECT "bookingId" FROM appointments
+                  WHERE ${isDoc ? sql`"doctorId" = ${String(ctx.user.id)} OR "doctorId" = ${ctx.user.openId || ""}` : sql`"userId" = ${ctx.user.id}`}
+                )
+              )
+              AND m."createdAt" >= NOW() - INTERVAL '48 hours'
+            ORDER BY m."createdAt" DESC
+            LIMIT 30;
+          `;
+          return rows.map((r: any) => ({
+            id: Number(r.id),
+            appointmentId: String(r.appointmentId),
+            bookingId: r.bookingId ? String(r.bookingId) : undefined,
+            senderId: Number(r.senderId),
+            senderName: String(r.senderName),
+            senderRole: String(r.senderRole),
+            message: String(r.message),
+            createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+          }));
+        } catch (e) {
+          console.warn("[Chat Router] getRecentNotifications error:", e);
+          return [];
+        }
+      }),
     sendMessage: publicProcedure
       .input(
         z.object({

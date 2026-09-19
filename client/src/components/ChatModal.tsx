@@ -3,7 +3,7 @@ import { io, Socket } from "socket.io-client";
 import { MessageSquare, Send, X, Minimize2, Maximize2, ShieldCheck, Stethoscope, User as UserIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { playNotificationChime, playSentMessageSound } from "@/contexts/ChatContext";
+import { playNotificationChime, playSentMessageSound, getSocketUrl } from "@/contexts/ChatContext";
 
 export interface ChatTarget {
   appointmentId: string;
@@ -44,64 +44,91 @@ export default function ChatModal({ open, onClose, target }: ChatModalProps) {
     { appointmentId: target?.appointmentId || "" },
     {
       enabled: open && !!target?.appointmentId,
-      refetchInterval: 6000, // Poll fallback for serverless/Vercel
+      refetchInterval: 2500, // Active poll fallback for serverless/Vercel
     }
   );
 
   // Sync historical messages
   useEffect(() => {
     if (historyQuery.data) {
-      setMessages(historyQuery.data);
+      setMessages((prev) => {
+        // Play chime if new peer message arrives via polling
+        if (prev.length > 0 && historyQuery.data.length > prev.length) {
+          const newest = historyQuery.data[historyQuery.data.length - 1];
+          if (newest && newest.senderId !== user?.id) {
+            playNotificationChime();
+          }
+        }
+        return historyQuery.data;
+      });
     }
-  }, [historyQuery.data]);
+  }, [historyQuery.data, user?.id]);
 
-  // Socket.io connection
+  // Socket.io connection (only when a socket server is available)
   useEffect(() => {
     if (!open || !target?.appointmentId) return;
 
-    // Connect to current host's socket endpoint
-    const socket = io({
-      path: "/socket.io",
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 5,
-    });
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      setSocketConnected(true);
-      socket.emit("join_chat", {
-        appointmentId: target.appointmentId,
-        userId: user?.id,
-        userName: user?.name || (isDoctor ? "Doctor" : "Patient"),
-        role: user?.role || "user",
-      });
-    });
-
-    socket.on("receive_message", (newMsg: any) => {
-      setMessages((prev) => {
-        // Prevent duplicate messages
-        if (prev.some((m) => m.id === newMsg.id || (m.createdAt === newMsg.createdAt && m.senderId === newMsg.senderId))) {
-          return prev;
-        }
-        return [...prev, newMsg];
-      });
-
-      // Play chime if message from other party
-      if (newMsg.senderId !== user?.id) {
-        playNotificationChime();
-      }
-    });
-
-    socket.on("user_typing", (data: { userName: string; isTyping: boolean }) => {
-      setIsOtherTyping(data.isTyping);
-    });
-
-    socket.on("disconnect", () => {
+    const socketUrl = getSocketUrl();
+    if (!socketUrl) {
       setSocketConnected(false);
-    });
+      return;
+    }
+
+    let socket: Socket | null = null;
+    try {
+      socket = io(socketUrl, {
+        path: "/socket.io",
+        transports: ["polling", "websocket"],
+        reconnectionAttempts: 2,
+        timeout: 3000,
+      });
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        setSocketConnected(true);
+        socket?.emit("join_chat", {
+          appointmentId: target.appointmentId,
+          userId: user?.id,
+          userName: user?.name || (isDoctor ? "Doctor" : "Patient"),
+          role: user?.role || "user",
+        });
+      });
+
+      socket.on("connect_error", () => {
+        setSocketConnected(false);
+        socket?.disconnect();
+      });
+
+      socket.on("receive_message", (newMsg: any) => {
+        setMessages((prev) => {
+          // Prevent duplicate messages
+          if (prev.some((m) => m.id === newMsg.id || (m.createdAt === newMsg.createdAt && m.senderId === newMsg.senderId))) {
+            return prev;
+          }
+          return [...prev, newMsg];
+        });
+
+        // Play chime if message from other party
+        if (newMsg.senderId !== user?.id) {
+          playNotificationChime();
+        }
+      });
+
+      socket.on("user_typing", (data: { userName: string; isTyping: boolean }) => {
+        setIsOtherTyping(data.isTyping);
+      });
+
+      socket.on("disconnect", () => {
+        setSocketConnected(false);
+      });
+    } catch {
+      setSocketConnected(false);
+    }
 
     return () => {
-      socket.disconnect();
+      if (socket) {
+        socket.disconnect();
+      }
       socketRef.current = null;
     };
   }, [open, target?.appointmentId, user?.id, user?.name, user?.role, isDoctor]);
