@@ -3,8 +3,10 @@ import { motion } from "framer-motion";
 import { ArrowRight, Check, ChevronRight, Clock3, MapPin, ShieldCheck, Stethoscope, UsersRound } from "lucide-react";
 import { AssistantCard, AppLayout, DoctorCard, HospitalCard, SearchBar, SectionHeading, TrustPill, VoiceReminderCard } from "@/components/DocxShell";
 import { doctors, hospitals, testimonials } from "@/lib/mock-data";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Home() {
+  const { isAuthenticated } = useAuth();
   return <AppLayout>
     <section className="relative overflow-hidden bg-[#f1f7f1]">
       <div className="absolute -left-28 top-10 size-72 rounded-full bg-[#dcefe5]/70 blur-3xl" />
@@ -35,7 +37,7 @@ export default function Home() {
 
     <section className="container py-20 sm:py-28"><SectionHeading eyebrow="Meet your care team" title="Good doctors. Clear next steps." body="Profiles that make it easy to understand a doctor's expertise, availability, and the hospitals where they see patients." action={<Link href="/hospitals" className="hidden items-center gap-2 text-sm font-bold text-[#146b5a] sm:inline-flex">Find a doctor <ArrowRight size={15} /></Link>} /><div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5">{doctors.slice(0, 3).map((doctor) => <DoctorCard key={doctor.id} doctor={doctor} />)}</div></section>
 
-    <section className="bg-[#fbfaf6] pb-20 sm:pb-28"><div className="container grid gap-5 lg:grid-cols-2"><AssistantCard /><VoiceReminderCard /></div></section>
+    <section className="bg-[#fbfaf6] pb-20 sm:pb-28"><div className={`container ${isAuthenticated ? "grid gap-5 lg:grid-cols-2" : "max-w-4xl"}`}><AssistantCard />{isAuthenticated && <VoiceReminderCard />}</div></section>
 
     <section className="bg-[#103e38] py-20 sm:py-24"><div className="container"><div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-end"><div><div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#f0b1a5]">A little more ease</div><h2 className="mt-3 font-display text-3xl font-semibold leading-[1.04] tracking-[-0.05em] text-white sm:text-[44px]">“I finally felt like someone had thought this through.”</h2></div><div className="grid gap-3 sm:grid-cols-3">{testimonials.map((item, index) => <div key={item.name} className={`rounded-[22px] p-5 ${index === 1 ? "bg-[#f0b1a5] text-[#71352f]" : "bg-white/10 text-white"}`}><div className="flex items-center gap-1 text-[#f5c36a]">★★★★★</div><p className={`mt-4 text-sm leading-6 ${index === 1 ? "text-[#7d443c]" : "text-white/75"}`}>“{item.quote}”</p><div className="mt-5 flex items-center gap-2.5"><span className={`grid size-8 place-items-center rounded-full text-[10px] font-bold ${index === 1 ? "bg-[#d9887b] text-[#71352f]" : "bg-white/15 text-white"}`}>{item.initials}</span><div><div className="text-xs font-bold">{item.name}</div><div className={`mt-0.5 text-[10px] ${index === 1 ? "text-[#9c5c53]" : "text-white/45"}`}>{item.meta}</div></div></div></div>)}</div></div></div></section>
 

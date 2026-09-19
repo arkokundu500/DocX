@@ -436,10 +436,14 @@ export function VoiceReminderCard({
   appointment?: any;
   compact?: boolean;
 }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, clerkUser, isAuthenticated } = useAuth();
   const utils = trpc.useUtils();
   const [isCalling, setIsCalling] = useState(false);
   const [confirmedLocally, setConfirmedLocally] = useState(false);
+
+  if (!isAuthenticated && !appointment) {
+    return null;
+  }
 
   // If appointment is not passed as prop, query patient's appointments if authenticated
   const myAppts = trpc.appointments.mine.useQuery(undefined, {
@@ -521,8 +525,22 @@ export function VoiceReminderCard({
     },
   });
 
-  const [customPhone, setCustomPhone] = useState(user?.phone || activeAppt?.patientPhone || "+917439817750");
+  const detectedPhone =
+    user?.phone?.trim() ||
+    clerkUser?.primaryPhoneNumber?.phoneNumber?.trim() ||
+    clerkUser?.phoneNumbers?.[0]?.phoneNumber?.trim() ||
+    activeAppt?.patientPhone?.trim() ||
+    "";
+
+  const [customPhone, setCustomPhone] = useState(detectedPhone || "+917439817750");
+  const [hasManuallyEdited, setHasManuallyEdited] = useState(false);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
+
+  useEffect(() => {
+    if (!hasManuallyEdited && detectedPhone) {
+      setCustomPhone(detectedPhone);
+    }
+  }, [detectedPhone, hasManuallyEdited]);
 
   const handleConfirm = () => {
     if (bookingId) {
@@ -534,7 +552,7 @@ export function VoiceReminderCard({
   };
 
   const handleTestCall = async () => {
-    const targetPhone = customPhone.trim() || user?.phone || activeAppt?.patientPhone || "+917439817750";
+    const targetPhone = customPhone.trim() || detectedPhone || "+917439817750";
     setIsCalling(true);
     try {
       const res = await createVoiceReminder.mutateAsync({
@@ -600,7 +618,10 @@ export function VoiceReminderCard({
               <div className="flex items-center gap-2 rounded-full border border-[#ead8d0] bg-white px-3 py-1 shadow-xs">
                 <input
                   value={customPhone}
-                  onChange={(e) => setCustomPhone(e.target.value)}
+                  onChange={(e) => {
+                    setCustomPhone(e.target.value);
+                    setHasManuallyEdited(true);
+                  }}
                   placeholder="+91..."
                   className="w-32 bg-transparent text-xs font-bold text-[#71352f] outline-none"
                 />
